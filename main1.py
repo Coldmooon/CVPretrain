@@ -113,6 +113,8 @@ parser.add_argument('--compiled', default=0, type=int,
                     help='If use torch.compile, default is 0.')
 parser.add_argument('--disable_dali', default=False, action='store_true',
                     help='Disable DALI data loader and use native PyTorch one instead.')
+parser.add_argument('--label_smoothing', default=0.0, type=float,
+                    help='label_smoothing')
 
 
 @pipeline_def
@@ -329,7 +331,7 @@ def main_worker(gpu, ngpus_per_node, args):
         run.watch(model)
 
     # define loss function (criterion), optimizer, and learning rate scheduler
-    criterion = nn.CrossEntropyLoss().to(device)
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
