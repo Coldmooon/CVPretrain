@@ -26,16 +26,7 @@ from torch.utils.data import Subset
 
 import wandb
 import torch.cuda.amp as amp
-
-import nvidia.dali.ops as ops
-import nvidia.dali.types as types
-from nvidia.dali.pipeline import Pipeline
-from nvidia.dali.plugin.pytorch import DALIGenericIterator
-
-import nvidia.dali as dali
-import nvidia.dali.ops as ops
-import nvidia.dali.types as types
-from nvidia.dali.plugin.pytorch import DALIGenericIterator
+import math
 
 try:
     from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy
@@ -265,7 +256,6 @@ def main_worker(gpu, ngpus_per_node, args):
     # Check to see if local_rank is 0
     is_master = args.rank == 0
     do_log = run is not None
-    do_log = None
 
     # create model
     if args.pretrained:
@@ -294,7 +284,12 @@ def main_worker(gpu, ngpus_per_node, args):
                 if args.compiled == 1:
                     model = torch.compile(model)   
 
-                model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+                s = torch.cuda.Stream()
+                s.wait_stream(torch.cuda.current_stream())
+                with torch.cuda.stream(s):
+                    model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
+                torch.cuda.current_stream().wait_stream(s)
+                # model = torch.nn.parallel.DistributedDataParallel(model, device_ids=[args.gpu])
             else:
                 model.cuda()
 
@@ -624,35 +619,37 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args, run=No
 
 def validate(val_loader, model, criterion, args):
 
+    if args.disable_dali:
+        val_loader = data_prefetcher(val_loader)
+        val_loader = iter(val_loader)
+        if args.distributed:
+            val_loader_len = len(val_loader.sampler) 
+        else:
+            val_loader_len = len(val_loader)
+    else:
+        val_loader_len = int(math.ceil(val_loader._size / args.batch_size))
+
     def run_validate(loader, base_progress=0):
         with torch.no_grad():
             end = time.time()
 
-            if args.disable_dali:
-                data_iterator = data_prefetcher(loader)
-                data_iterator = iter(data_iterator)
-            else:
-                data_iterator = loader
-            for i, data in enumerate(data_iterator):
-                
+            for i, data in enumerate(loader):
                 if args.disable_dali:
                     images, target = data
-                    val_loader_len = len(val_loader)
                 else:
                     images = data[0]["data"]
                     target = data[0]["label"].squeeze(-1).long()
-                    val_loader_len = int(math.ceil(data_iterator._size / args.batch_size))
-
+                    
                 i = base_progress + i
                 if args.gpu is not None and torch.cuda.is_available():
                     # images = images.cuda(args.gpu, non_blocking=True)
-                    pass # DALI
+                    pass # just pass for DALI
                 if torch.backends.mps.is_available():
                     images = images.to('mps')
                     target = target.to('mps')
                 if torch.cuda.is_available():
                     # target = target.cuda(args.gpu, non_blocking=True)
-                    pass # DALI
+                    pass # just pass for DALI
 
                 # compute output
                 output = model(images)
@@ -676,9 +673,10 @@ def validate(val_loader, model, criterion, args):
     top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
     top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
     progress = ProgressMeter(
-        len(val_loader) + (args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
+        # len(val_loader) + (args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset))),
+        val_loader_len,
         [batch_time, losses, top1, top5],
-        prefix='Test: ')
+        prefix='Test: ')    
 
     # switch to evaluate mode
     model.eval()
@@ -688,13 +686,18 @@ def validate(val_loader, model, criterion, args):
         top1.all_reduce()
         top5.all_reduce()
 
-    if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
-        aux_val_dataset = Subset(val_loader.dataset,
-                                 range(len(val_loader.sampler) * args.world_size, len(val_loader.dataset)))
-        aux_val_loader = torch.utils.data.DataLoader(
-            aux_val_dataset, batch_size=args.batch_size, shuffle=False,
-            num_workers=args.workers, pin_memory=True)
-        run_validate(aux_val_loader, len(val_loader))
+    if not args.disable_dali:
+        # # TO DO: for DALI: ensure that in distributed training mode, each process can evaluate the entire validation set, instead of only a part of the data.
+        pass 
+    else:
+        # Distributed PyTorch validation
+        if args.distributed and (len(val_loader.sampler) * args.world_size < len(val_loader.dataset)):
+            aux_val_dataset = Subset(val_loader.dataset,
+                                    range(len(val_loader.sampler) * args.world_size, len(val_loader.dataset)))
+            aux_val_loader = torch.utils.data.DataLoader(
+                aux_val_dataset, batch_size=args.batch_size, shuffle=False,
+                num_workers=args.workers, pin_memory=True)
+            run_validate(aux_val_loader, len(val_loader))
 
     progress.display_summary()
     
