@@ -241,6 +241,7 @@ def main_worker(gpu, ngpus_per_node, args):
             config={
                     "architecture": args.arch,
                     "learning_rate": args.lr,
+                    "label_smoothing": args.label_smoothing,
                     "epochs": args.epochs,
                     "batch_size": args.batch_size * args.world_size / ngpus_per_node,
                     "dataset": "ImageNet 2012",
