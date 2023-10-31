@@ -27,6 +27,7 @@ from torch.utils.data import Subset
 import wandb
 import torch.cuda.amp as amp
 import math
+from torchvision.transforms import v2
 
 try:
     from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy
@@ -113,8 +114,8 @@ parser.add_argument('--compiled', default=0, type=int,
                     help='If use torch.compile, default is 0.')
 parser.add_argument('--disable_dali', default=False, action='store_true',
                     help='Disable DALI data loader and use native PyTorch one instead.')
-parser.add_argument('--label_smoothing', default=0.0, type=float,
-                    help='label_smoothing')
+parser.add_argument('--ls', '--label-smoothing', default=0.0, type=float, dest='label_smoothing',
+                    help='label smoothing')
 
 
 @pipeline_def
@@ -550,6 +551,14 @@ class data_prefetcher():
             raise StopIteration
         return input, target
 
+def datamix(images, target):
+    cutmix = v2.CutMix(num_classes=1000)
+    mixup = v2.MixUp(num_classes=1000)
+    cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
+    # converted to one-hot targets
+    images, target = cutmix_or_mixup(images, target)
+    return images, target
+
 
 def train(train_loader, model, criterion, optimizer, epoch, device, args, run=None, scaler=None, do_log=None):
     batch_time = AverageMeter('Time', ':6.3f')
@@ -582,6 +591,8 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args, run=No
         else:
             images = data[0]["data"]
             target = data[0]["label"].squeeze(-1).long()
+
+        images, target = datamix(images, target)
 
         # # move data to the same device as model
         # images = images.to(device, non_blocking=True)
@@ -796,6 +807,9 @@ def accuracy(output, target, topk=(1,)):
     with torch.no_grad():
         maxk = max(topk)
         batch_size = target.size(0)
+
+        # Convert one-hot target to index form
+        target = torch.argmax(target, dim=1)
 
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
