@@ -345,7 +345,7 @@ def main_worker(gpu, ngpus_per_node, args):
     
     from warmup1 import WarmupLR1 as WarmupLR
     # Create an instance of the warmup scheduler with the desired parameters
-    warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/0.4, total_iters=5, verbose=True)
+    warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/args.lr, total_iters=5, verbose=True)
     # Create an instance of the step decay scheduler with the desired parameters
     step_scheduler = MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1, verbose=True)
     # Create an instance of the chained scheduler that combines the two schedulers
