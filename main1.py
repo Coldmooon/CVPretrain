@@ -27,7 +27,7 @@ from torch.utils.data import Subset
 import wandb
 import torch.cuda.amp as amp
 import math
-from torchvision.transforms import v2
+from datasets import transforms as localtrans
 
 try:
     from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy
@@ -551,15 +551,6 @@ class data_prefetcher():
             raise StopIteration
         return input, target
 
-def datamix(images, target):
-    cutmix = v2.CutMix(num_classes=1000)
-    mixup = v2.MixUp(num_classes=1000)
-    cutmix_or_mixup = v2.RandomChoice([cutmix, mixup])
-    # converted to one-hot targets
-    images, target = cutmix_or_mixup(images, target)
-    return images, target
-
-
 def train(train_loader, model, criterion, optimizer, epoch, device, args, run=None, scaler=None, do_log=None):
     batch_time = AverageMeter('Time', ':6.3f')
     data_time = AverageMeter('Data', ':6.3f')
@@ -592,7 +583,7 @@ def train(train_loader, model, criterion, optimizer, epoch, device, args, run=No
             images = data[0]["data"]
             target = data[0]["label"].squeeze(-1).long()
 
-        images, target = datamix(images, target)
+        images, target = localtrans.datamix(images, target)
 
         # # move data to the same device as model
         # images = images.to(device, non_blocking=True)
@@ -808,8 +799,16 @@ def accuracy(output, target, topk=(1,)):
         maxk = max(topk)
         batch_size = target.size(0)
 
-        # Convert one-hot target to index form
-        target = torch.argmax(target, dim=1)
+        # Check the dimension of the target
+        if target.dim() == 1:
+            # Target is already 1-D, use it directly
+            pass
+        elif target.dim() == 2:
+            # Target is 2-D, get the indices by using torch.max
+            target = torch.argmax(target, dim=1)
+        else:
+            # Target has an invalid dimension, raise an error
+            raise ValueError("Target should be either 1-D or 2-D")
 
         _, pred = output.topk(maxk, 1, True, True)
         pred = pred.t()
