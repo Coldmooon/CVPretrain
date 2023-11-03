@@ -4,8 +4,9 @@ CatPretrain.cv is a project that optimizes the official PyTorch example on Image
 
 ## Requirements
 
-- PyTorch 1.9 or higher
+- PyTorch 2.0 or higher
 - torchvision 0.16 or higher
+- NVIDIA DALI 1.31 or higher
 
 ## Training
 
