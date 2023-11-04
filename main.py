@@ -23,7 +23,7 @@ import torch.cuda.amp as amp
 
 from opts import ArgumentParser
 from datasets import dataloader as Dataloader
-import train as Trainer
+from train import Trainer
 
 best_acc1 = 0
 best_acc5 = 0
@@ -200,7 +200,7 @@ def main_worker(gpu, ngpus_per_node, args):
     # Create an instance of the warmup scheduler with the desired parameters
     warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/args.lr, total_iters=5, verbose=True)
     # Create an instance of the step decay scheduler with the desired parameters
-    step_scheduler = MultiStepLR(optimizer, milestones=[30, 60, 80], gamma=0.1, verbose=True)
+    step_scheduler = MultiStepLR(optimizer, milestones=[60, 120, 150, 190], gamma=0.1, verbose=True)
     # Create an instance of the chained scheduler that combines the two schedulers
     scheduler = ChainedScheduler([warmup_scheduler, step_scheduler])
 
@@ -229,8 +229,10 @@ def main_worker(gpu, ngpus_per_node, args):
 
     train_loader, val_loader = Dataloader.dataloader(args.batch_size, args.data, args.workers, args.rank, args.world_size, args.distributed, args.dummy, args.disable_dali)
 
+    Training = Trainer(model, optimizer, criterion, scheduler, args.gpu, args)
+
     if args.evaluate:
-        Trainer.validate(val_loader, model, criterion, args)
+        Training.validate(val_loader)
         return
     
     print("--------------------------------------------------------------------")
@@ -249,19 +251,19 @@ def main_worker(gpu, ngpus_per_node, args):
             train_loader.sampler.set_epoch(epoch)
 
         # train for one epoch
-        Trainer.train(train_loader, model, criterion, optimizer, epoch, device, args, run, scaler, do_log)
+        Training.train(train_loader, scaler, epoch, args.print_freq, run)
 
         # evaluate on validation set
-        if (epoch >= args.epochs - 10):
-            acc1, acc5 = Trainer.validate(val_loader, model, criterion, args)
+        # if (epoch >= args.epochs - 40):
+        acc1, acc5 = Training.validate(val_loader)
         
         scheduler.step()
         
         # remember best acc@1 and save checkpoint
-        if (epoch >= args.epochs - 10):
-            is_best = acc1 > best_acc1
-            best_acc1 = max(acc1, best_acc1)
-            best_acc5 = max(acc5, best_acc5)
+        # if (epoch >= args.epochs - 40):
+        is_best = acc1 > best_acc1
+        best_acc1 = max(acc1, best_acc1)
+        best_acc5 = max(acc5, best_acc5)
 
         if do_log:
             run.log({"learning_rate": optimizer.param_groups[0]["lr"], "top1.val": best_acc1, "top5.val": best_acc5})
