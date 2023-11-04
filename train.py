@@ -7,6 +7,13 @@ import torch.cuda.amp as amp
 from torch.utils.data import Subset
 from datasets import transforms as Localtrans
 
+
+class Summary(Enum):
+    NONE = 0
+    AVERAGE = 1
+    SUM = 2
+    COUNT = 3
+
 class Trainer:
     def __init__(self, model, optimizer, criterion, scheduler, device, args):
         self.model = model
@@ -96,10 +103,10 @@ class Trainer:
             val_loader_len = int(math.ceil(val_loader._size / self.args.batch_size))
 
         # Initialize the meters to track the metrics  
-        batch_time = self.AverageMeter('Time', ':6.3f', self.Summary.NONE)
-        losses = self.AverageMeter('Loss', ':.4e', self.Summary.NONE)
-        top1 = self.AverageMeter('Acc@1', ':6.2f', self.Summary.AVERAGE)
-        top5 = self.AverageMeter('Acc@5', ':6.2f', self.Summary.AVERAGE)
+        batch_time = self.AverageMeter('Time', ':6.3f', Summary.NONE)
+        losses = self.AverageMeter('Loss', ':.4e', Summary.NONE)
+        top1 = self.AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+        top5 = self.AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
         progress = self.ProgressMeter(
             val_loader_len,
             [batch_time, losses, top1, top5],
@@ -205,19 +212,13 @@ class Trainer:
                 res.append(correct_k.mul_(100.0 / batch_size))
             return res
 
-    class Summary(Enum):
-        NONE = 0
-        AVERAGE = 1
-        SUM = 2
-        COUNT = 3
-
     # Define any helper functions or classes that are used by the methods
     class AverageMeter(object):
         """Computes and stores the average and current value"""
-        def __init__(self, name, fmt=':f', summary_type=None):
+        def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
             self.name = name
             self.fmt = fmt
-            self.summary_type = summary_type or 1
+            self.summary_type = summary_type
             self.reset()
 
 
@@ -255,13 +256,13 @@ class Trainer:
         
         def summary(self):
             fmtstr = ''
-            if self.summary_type is Summary.NONE:
+            if self.summary_type == Summary.NONE:
                 fmtstr = ''
-            elif self.summary_type is Summary.AVERAGE:
+            elif self.summary_type == Summary.AVERAGE:
                 fmtstr = '{name} {avg:.3f}'
-            elif self.summary_type is Summary.SUM:
+            elif self.summary_type == Summary.SUM:
                 fmtstr = '{name} {sum:.3f}'
-            elif self.summary_type is Summary.COUNT:
+            elif self.summary_type == Summary.COUNT:
                 fmtstr = '{name} {count:.3f}'
             else:
                 raise ValueError('invalid summary type %r' % self.summary_type)
