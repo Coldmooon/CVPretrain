@@ -1,6 +1,6 @@
-# CatPretrain.cv
+# CVPretrain
 
-CatPretrain.cv is a project that optimizes the official PyTorch example on ImageNet. 
+CVPretrain is a project that optimizes the official PyTorch example on ImageNet. 
 
 ## Requirements
 
