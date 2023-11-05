@@ -196,7 +196,7 @@ def main_worker(gpu, ngpus_per_node, args):
     """Sets the learning rate to the initial LR decayed by 10 every 30 epochs"""
     # scheduler = StepLR(optimizer, step_size=30, gamma=0.1)
     
-    from warmup1 import WarmupLR1 as WarmupLR
+    from warmup import WarmupLR1 as WarmupLR
     # Create an instance of the warmup scheduler with the desired parameters
     warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/args.lr, total_iters=5, verbose=True)
     # Create an instance of the step decay scheduler with the desired parameters
