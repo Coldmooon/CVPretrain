@@ -131,25 +131,25 @@ def create_dali_pipeline(data_dir, crop, size, shard_id, num_shards, dali_cpu=Fa
     return images, labels
 
 # Data loading code
-def dataloader(batch_size, data, workers, rank, world_size, distributed, dummy, disable_dali):
-    if dummy:
+def dataloader(args):
+    if args.dummy:
         print("=> Dummy data is used!")
         train_dataset = datasets.FakeData(1281167, (3, 224, 224), 1000, transforms.ToTensor())
         val_dataset = datasets.FakeData(50000, (3, 224, 224), 1000, transforms.ToTensor())
-    elif not disable_dali:
-        traindir = os.path.join(data, 'train')
-        valdir = os.path.join(data, 'val')
+    elif not args.disable_dali:
+        traindir = os.path.join(args.data, 'train')
+        valdir = os.path.join(args.data, 'val')
         
-        train_pipe = create_dali_pipeline(batch_size=batch_size,
-                                          num_threads=workers,
-                                          device_id=rank,
-                                          seed=12 + rank,
+        train_pipe = create_dali_pipeline(batch_size=args.batch_size,
+                                          num_threads=args.workers,
+                                          device_id=args.rank,
+                                          seed=12 + args.rank,
                                           data_dir=traindir,
                                           crop=224,
                                           size=256,
                                           dali_cpu=False,
-                                          shard_id=rank,
-                                          num_shards=world_size,
+                                          shard_id=args.rank,
+                                          num_shards=args.world_size,
                                           is_training=True)
         train_pipe.build()
         train_loader = DALIClassificationIterator(train_pipe, reader_name="Reader",
@@ -157,24 +157,24 @@ def dataloader(batch_size, data, workers, rank, world_size, distributed, dummy, 
                                                   auto_reset=True)
 
 
-        val_pipe = create_dali_pipeline(batch_size=batch_size,
-                                        num_threads=workers,
-                                        device_id=rank,
-                                        seed=12 + rank,
+        val_pipe = create_dali_pipeline(batch_size=args.batch_size,
+                                        num_threads=args.workers,
+                                        device_id=args.rank,
+                                        seed=12 + args.rank,
                                         data_dir=valdir,
                                         crop=224,
                                         size=256,
                                         dali_cpu=False,
-                                        shard_id=rank,
-                                        num_shards=world_size,
+                                        shard_id=args.rank,
+                                        num_shards=args.world_size,
                                         is_training=False)
         val_pipe.build()
         val_loader = DALIClassificationIterator(val_pipe, reader_name="Reader",
                                                 last_batch_policy=LastBatchPolicy.PARTIAL,
                                                 auto_reset=True)
     else:
-        traindir = os.path.join(data, 'train')
-        valdir = os.path.join(data, 'val')
+        traindir = os.path.join(args.data, 'train')
+        valdir = os.path.join(args.data, 'val')
         normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                      std=[0.229, 0.224, 0.225])
 
@@ -196,7 +196,7 @@ def dataloader(batch_size, data, workers, rank, world_size, distributed, dummy, 
                 normalize,
             ]))
 
-        if distributed:
+        if args.distributed:
             train_sampler = torch.utils.data.distributed.DistributedSampler(train_dataset)
             val_sampler = torch.utils.data.distributed.DistributedSampler(val_dataset, shuffle=False, drop_last=True)
         else:
@@ -204,17 +204,17 @@ def dataloader(batch_size, data, workers, rank, world_size, distributed, dummy, 
             val_sampler = None
 
         train_loader = torch.utils.data.DataLoader(
-            train_dataset, batch_size=batch_size, shuffle=(train_sampler is None),
-            num_workers=workers, pin_memory=True, sampler=train_sampler)
+            train_dataset, batch_size=args.batch_size, shuffle=(train_sampler is None),
+            num_workers=args.workers, pin_memory=True, sampler=train_sampler)
 
         val_loader = torch.utils.data.DataLoader(
-            val_dataset, batch_size=batch_size, shuffle=False,
-            num_workers=workers, pin_memory=True, sampler=val_sampler)
+            val_dataset, batch_size=args.batch_size, shuffle=False,
+            num_workers=args.workers, pin_memory=True, sampler=val_sampler)
         
         train_loader = data_prefetcher(train_loader)
         train_loader = iter(train_loader)
-        val_loader    = data_prefetcher(val_loader)
-        val_loader    = iter(val_loader)
+        val_loader   = data_prefetcher(val_loader)
+        val_loader   = iter(val_loader)
 
 
     return train_loader, val_loader

@@ -1,7 +1,7 @@
 from torch.optim.lr_scheduler import LinearLR
 
 # Define a custom class that inherits from LinearLR
-class WarmupLR1(LinearLR):
+class WarmupLR(LinearLR):
     # Override the constructor to accept an additional argument: end_factor
     def __init__(self, optimizer, start_factor, end_factor=1.0, total_iters=5, last_epoch=-1, verbose=False):
         # Pass the end_factor argument to the parent class constructor

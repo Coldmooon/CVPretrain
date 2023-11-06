@@ -7,33 +7,121 @@ import torch.cuda.amp as amp
 from torch.utils.data import Subset
 from datasets import transforms as Localtrans
 
-
 class Summary(Enum):
     NONE = 0
     AVERAGE = 1
     SUM = 2
     COUNT = 3
 
+
+# Define any helper functions or classes that are used by the methods
+class AverageMeter(object):
+    """Computes and stores the average and current value"""
+    def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
+        self.name = name
+        self.fmt = fmt
+        self.summary_type = summary_type
+        self.reset()
+
+
+    def reset(self):
+        self.val = 0
+        self.avg = 0
+        self.sum = 0
+        self.count = 0
+
+
+    def update(self, val, n=1):
+        self.val = val
+        self.sum += val * n
+        self.count += n
+        self.avg = self.sum / self.count
+
+
+    def all_reduce(self):
+        if torch.cuda.is_available():
+            device = torch.device("cuda")
+        elif torch.backends.mps.is_available():
+            device = torch.device("mps")
+        else:
+            device = torch.device("cpu")
+        total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
+        dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
+        self.sum, self.count = total.tolist()
+        self.avg = self.sum / self.count
+
+
+    def __str__(self):
+        fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
+        return fmtstr.format(**self.__dict__)
+
+    
+    def summary(self):
+        fmtstr = ''
+        if self.summary_type == Summary.NONE:
+            fmtstr = ''
+        elif self.summary_type == Summary.AVERAGE:
+            fmtstr = '{name} {avg:.3f}'
+        elif self.summary_type == Summary.SUM:
+            fmtstr = '{name} {sum:.3f}'
+        elif self.summary_type == Summary.COUNT:
+            fmtstr = '{name} {count:.3f}'
+        else:
+            raise ValueError('invalid summary type %r' % self.summary_type)
+        
+        return fmtstr.format(**self.__dict__)
+
+
+class ProgressMeter(object):
+    def __init__(self, num_batches, meters, prefix=""):
+        self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
+        self.meters = meters
+        self.prefix = prefix
+
+
+    def display(self, batch):
+        entries = [self.prefix + self.batch_fmtstr.format(batch)]
+        entries += [str(meter) for meter in self.meters]
+        print('\t'.join(entries))
+        
+
+    def display_summary(self):
+        entries = [" *"]
+        entries += [meter.summary() for meter in self.meters]
+        print(' '.join(entries))
+
+
+    def _get_batch_fmtstr(self, num_batches):
+        num_digits = len(str(num_batches // 1))
+        fmt = '{:' + str(num_digits) + 'd}'
+        return '[' + fmt + '/' + fmt.format(num_batches) + ']'
+
+
 class Trainer:
-    def __init__(self, model, optimizer, criterion, scheduler, device, args):
+    def __init__(self, model, optimizer, criterion, scheduler, args):
         self.model = model
         self.optimizer = optimizer
         self.criterion = criterion
         self.scheduler = scheduler
-        self.device = device
         self.args = args
+        print("--------------------------------------------------------------------")
+        print("Support BF16?", torch.cuda.is_bf16_supported())
+        print("torch.backends.cudnn.allow_tf32: ", torch.backends.cudnn.allow_tf32)
+        print("torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction", torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction)
+        print("--------------------------------------------------------------------")
+        self.scaler = amp.GradScaler() 
 
-    def train(self, train_loader, scaler, epoch, print_freq, run):
+    def train(self, train_loader, epoch, run):
 
         self.model.train()
 
         # Initialize the meters to track the metrics
-        batch_time = self.AverageMeter('Time', ':6.3f')
-        data_time = self.AverageMeter('Data', ':6.3f')
-        losses = self.AverageMeter('Loss', ':.4e')
-        top1 = self.AverageMeter('Acc@1', ':6.2f')
-        top5 = self.AverageMeter('Acc@5', ':6.2f')
-        progress = self.ProgressMeter(
+        batch_time = AverageMeter('Time', ':6.3f')
+        data_time = AverageMeter('Data', ':6.3f')
+        losses = AverageMeter('Loss', ':.4e')
+        top1 = AverageMeter('Acc@1', ':6.2f')
+        top5 = AverageMeter('Acc@5', ':6.2f')
+        progress = ProgressMeter(
             len(train_loader),
             [batch_time, data_time, losses, top1, top5],
             prefix="Epoch: [{}]".format(epoch))       
@@ -49,8 +137,8 @@ class Trainer:
             if self.args.disable_dali:
                 images, target = data
                 # move data to the same device as model
-                images = images.to(self.device, non_blocking=True)
-                target = target.to(self.device, non_blocking=True)
+                images = images.to(self.args.gpu, non_blocking=True)
+                target = target.to(self.args.gpu, non_blocking=True)
             else:
                 images = data[0]["data"]
                 target = data[0]["label"].squeeze(-1).long()
@@ -75,16 +163,16 @@ class Trainer:
             # self.optimizer.step()
             
             # Use GradScaler to unscale and update the gradients
-            scaler.scale(loss).backward()
-            scaler.step(self.optimizer)
-            scaler.update()
+            self.scaler.scale(loss).backward()
+            self.scaler.step(self.optimizer)
+            self.scaler.update()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
             end = time.time()
 
             # Print the progress every print_freq batches
-            if i % print_freq == 0:
+            if i % self.args.print_freq == 0:
                 progress.display(i)
             if run is not None:
                 run.log({"data_time": data_time.val, "batch_loss": losses.avg, "batch_time": batch_time.val, "top1.train":top1.avg, "top5.train":top5.avg})
@@ -103,11 +191,11 @@ class Trainer:
             val_loader_len = int(math.ceil(val_loader._size / self.args.batch_size))
 
         # Initialize the meters to track the metrics  
-        batch_time = self.AverageMeter('Time', ':6.3f', Summary.NONE)
-        losses = self.AverageMeter('Loss', ':.4e', Summary.NONE)
-        top1 = self.AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
-        top5 = self.AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
-        progress = self.ProgressMeter(
+        batch_time = AverageMeter('Time', ':6.3f', Summary.NONE)
+        losses = AverageMeter('Loss', ':.4e', Summary.NONE)
+        top1 = AverageMeter('Acc@1', ':6.2f', Summary.AVERAGE)
+        top5 = AverageMeter('Acc@5', ':6.2f', Summary.AVERAGE)
+        progress = ProgressMeter(
             val_loader_len,
             [batch_time, losses, top1, top5],
             prefix='Test: ')  
@@ -212,85 +300,5 @@ class Trainer:
                 res.append(correct_k.mul_(100.0 / batch_size))
             return res
 
-    # Define any helper functions or classes that are used by the methods
-    class AverageMeter(object):
-        """Computes and stores the average and current value"""
-        def __init__(self, name, fmt=':f', summary_type=Summary.AVERAGE):
-            self.name = name
-            self.fmt = fmt
-            self.summary_type = summary_type
-            self.reset()
-
-
-        def reset(self):
-            self.val = 0
-            self.avg = 0
-            self.sum = 0
-            self.count = 0
-
-
-        def update(self, val, n=1):
-            self.val = val
-            self.sum += val * n
-            self.count += n
-            self.avg = self.sum / self.count
-
-
-        def all_reduce(self):
-            if torch.cuda.is_available():
-                device = torch.device("cuda")
-            elif torch.backends.mps.is_available():
-                device = torch.device("mps")
-            else:
-                device = torch.device("cpu")
-            total = torch.tensor([self.sum, self.count], dtype=torch.float32, device=device)
-            dist.all_reduce(total, dist.ReduceOp.SUM, async_op=False)
-            self.sum, self.count = total.tolist()
-            self.avg = self.sum / self.count
-
-
-        def __str__(self):
-            fmtstr = '{name} {val' + self.fmt + '} ({avg' + self.fmt + '})'
-            return fmtstr.format(**self.__dict__)
-
-        
-        def summary(self):
-            fmtstr = ''
-            if self.summary_type == Summary.NONE:
-                fmtstr = ''
-            elif self.summary_type == Summary.AVERAGE:
-                fmtstr = '{name} {avg:.3f}'
-            elif self.summary_type == Summary.SUM:
-                fmtstr = '{name} {sum:.3f}'
-            elif self.summary_type == Summary.COUNT:
-                fmtstr = '{name} {count:.3f}'
-            else:
-                raise ValueError('invalid summary type %r' % self.summary_type)
-            
-            return fmtstr.format(**self.__dict__)
-
-
-    class ProgressMeter(object):
-        def __init__(self, num_batches, meters, prefix=""):
-            self.batch_fmtstr = self._get_batch_fmtstr(num_batches)
-            self.meters = meters
-            self.prefix = prefix
-
-
-        def display(self, batch):
-            entries = [self.prefix + self.batch_fmtstr.format(batch)]
-            entries += [str(meter) for meter in self.meters]
-            print('\t'.join(entries))
-            
-        def display_summary(self):
-            entries = [" *"]
-            entries += [meter.summary() for meter in self.meters]
-            print(' '.join(entries))
-
-
-        def _get_batch_fmtstr(self, num_batches):
-            num_digits = len(str(num_batches // 1))
-            fmt = '{:' + str(num_digits) + 'd}'
-            return '[' + fmt + '/' + fmt.format(num_batches) + ']'
 
 

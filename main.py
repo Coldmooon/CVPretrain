@@ -17,7 +17,6 @@ from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.lr_scheduler import ChainedScheduler
 
 import wandb
-import torch.cuda.amp as amp
 
 from opts import ArgumentParser
 from datasets import dataloader as Dataloader
@@ -184,15 +183,15 @@ def main_worker(gpu, ngpus_per_node, args):
     if is_master:
         run.watch(model)
 
-    # define loss function (criterion), optimizer, and learning rate scheduler
+    # define loss function (criterion)
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
-
+    
+    # define optimizer
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
                                 weight_decay=args.weight_decay)
-    scaler = amp.GradScaler() 
-
-
+    
+    # define learning rate scheduler
     from warmup import WarmupLR
     # Create an instance of the warmup scheduler with the desired parameters
     warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/args.lr, total_iters=5, verbose=True)
@@ -206,19 +205,15 @@ def main_worker(gpu, ngpus_per_node, args):
     checkpoints = Checkpoints(args)
     best_acc1 = checkpoints.resume(model, optimizer, scheduler)
 
-    train_loader, val_loader = Dataloader.dataloader(args.batch_size, args.data, args.workers, args.rank, args.world_size, args.distributed, args.dummy, args.disable_dali)
+    # define dataloader
+    train_loader, val_loader = Dataloader.dataloader(args)
 
-    Training = Trainer(model, optimizer, criterion, scheduler, args.gpu, args)
+    # construct Trainer
+    Training = Trainer(model, optimizer, criterion, scheduler, args)
 
     if args.evaluate:
         Training.validate(val_loader)
         return
-    
-    print("--------------------------------------------------------------------")
-    print("Support BF16?", torch.cuda.is_bf16_supported())
-    print("torch.backends.cudnn.allow_tf32: ", torch.backends.cudnn.allow_tf32)
-    print("torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction", torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction)
-    print("--------------------------------------------------------------------")
 
     if do_log:
         run.log({"learning_rate": optimizer.param_groups[0]["lr"]})
@@ -230,23 +225,20 @@ def main_worker(gpu, ngpus_per_node, args):
             train_loader.sampler.set_epoch(epoch)
 
         # train for one epoch
-        Training.train(train_loader, scaler, epoch, args.print_freq, run)
+        Training.train(train_loader, epoch, run)
 
         # evaluate on validation set
-        # if (epoch >= args.epochs - 40):
         acc1, acc5 = Training.validate(val_loader)
         
         scheduler.step()
         
         # remember best acc@1 and save checkpoint
-        # if (epoch >= args.epochs - 40):
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
         best_acc5 = max(acc5, best_acc5)
 
         if do_log:
             run.log({"learning_rate": optimizer.param_groups[0]["lr"], "top1.val": best_acc1, "top5.val": best_acc5})
-
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
