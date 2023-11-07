@@ -12,10 +12,6 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 
-
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim.lr_scheduler import ChainedScheduler
-
 import wandb
 
 from opts import ArgumentParser
@@ -23,6 +19,8 @@ from datasets import dataloader as Dataloader
 from train import Trainer
 from checkpoints import Checkpoints
 from models.init import Model
+from scheduler import Scheduler
+
 
 best_acc1 = 0
 best_acc5 = 0
@@ -141,14 +139,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 weight_decay=args.weight_decay)
     
     # define learning rate scheduler
-    from warmup import WarmupLR
-    # Create an instance of the warmup scheduler with the desired parameters
-    warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/args.lr, total_iters=5, verbose=True)
-    # Create an instance of the step decay scheduler with the desired parameters
-    step_scheduler = MultiStepLR(optimizer, milestones=[60, 120, 150, 190], gamma=0.1, verbose=True)
-    # Create an instance of the chained scheduler that combines the two schedulers
-    scheduler = ChainedScheduler([warmup_scheduler, step_scheduler])
-    
+    scheduling = Scheduler(args)
+    scheduler = scheduling.creat(optimizer)
     
     # optionally resume from a checkpoint
     checkpoints = Checkpoints(args)
