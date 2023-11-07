@@ -12,15 +12,13 @@ import torch.optim
 import torch.utils.data
 import torch.utils.data.distributed
 
-import wandb
-
 from opts import ArgumentParser
 from datasets import dataloader as Dataloader
 from train import Trainer
 from checkpoints import Checkpoints
 from models.init import Model
 from scheduler import Scheduler
-
+from utils import logger
 
 best_acc1 = 0
 best_acc5 = 0
@@ -83,34 +81,8 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
 
-
-    run = None
-    if args.rank == 0:
-        print("Rank %d running wandb", args.rank)
-        run = wandb.init(
-            project="pytorch.examples.ddp",
-            config={
-                    "architecture": args.arch,
-                    "learning_rate": args.lr,
-                    "label_smoothing": args.label_smoothing,
-                    "epochs": args.epochs,
-                    "batch_size": args.batch_size * args.world_size / ngpus_per_node,
-                    "dataset": "ImageNet 2012",
-                    "num_workers": args.workers,
-                    "num_gpus": args.world_size,
-                    "world-size": args.world_size / ngpus_per_node,
-                    "compiled": args.compiled,
-                    "mixed precision": 1, 
-                   }
-            )
-    else:
-        print("Rank %d not running wandb", args.rank)
-        run = None
-
-    # Check to see if local_rank is 0
-    is_master = args.rank == 0
-    do_log = run is not None
-
+    # setup logger
+    wanlog = logger.wanlog(args, ngpus_per_node)
 
     # create modle
     modeling = Model(args)
@@ -127,8 +99,7 @@ def main_worker(gpu, ngpus_per_node, args):
         device = torch.device("cpu")
 
     # watch gradients only for rank 0
-    if is_master:
-        run.watch(model)
+    wanlog.watch(model)
 
     # define loss function (criterion)
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
@@ -156,8 +127,7 @@ def main_worker(gpu, ngpus_per_node, args):
         Training.validate(val_loader)
         return
 
-    if do_log:
-        run.log({"learning_rate": optimizer.param_groups[0]["lr"]})
+    wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
     is_best = None
     for epoch in range(args.start_epoch, args.epochs):
@@ -166,7 +136,7 @@ def main_worker(gpu, ngpus_per_node, args):
             train_loader.sampler.set_epoch(epoch)
 
         # train for one epoch
-        Training.train(train_loader, epoch, run)
+        Training.train(train_loader, epoch, wanlog)
 
         # evaluate on validation set
         acc1, acc5 = Training.validate(val_loader)
@@ -178,8 +148,7 @@ def main_worker(gpu, ngpus_per_node, args):
         best_acc1 = max(acc1, best_acc1)
         best_acc5 = max(acc5, best_acc5)
 
-        if do_log:
-            run.log({"learning_rate": optimizer.param_groups[0]["lr"], "top1.val": best_acc1, "top5.val": best_acc5})
+        wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"], "top1.val": best_acc1, "top5.val": best_acc5})
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -191,8 +160,8 @@ def main_worker(gpu, ngpus_per_node, args):
                 'optimizer' : optimizer.state_dict(),
                 'scheduler' : scheduler.state_dict()
             }, is_best)
-    if is_master:
-        run.finish()
+    
+    wanlog.finish()
 
 
 if __name__ == '__main__':
