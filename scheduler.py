@@ -2,6 +2,7 @@ import torch
 from torch.optim.lr_scheduler import LinearLR
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.optim.lr_scheduler import ChainedScheduler
+from torch.optim.lr_scheduler import LambdaLR
 
 
 # Define a custom class that inherits from LinearLR
@@ -18,11 +19,20 @@ class WarmupLR(LinearLR):
 
 
 class Scheduler:
-    def __init__(self, args):
+    def __init__(self, lr_policy, args):
+        self.lr_policy = lr_policy
         self.args = args
 
+    def create(self, optimizer, start_factor, end_factor=1, total_iters=5):
+        if self.lr_policy == "StepWarmup":
+            return self.StepWarmup(optimizer)
+        if self.lr_policy == "CosWarmup":
+            return self.CosinWarmup(optimizer, start_factor, end_factor, total_iters)
+        else:
+            raise ValueError("Unknow Learning Rate Policy...")
 
-    def creat(self, optimizer):
+
+    def StepWarmup(self, optimizer):
         # Create an instance of the warmup scheduler with the desired parameters
         warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/self.args.lr, total_iters=5, verbose=True)
         # Create an instance of the step decay scheduler with the desired parameters
@@ -32,7 +42,14 @@ class Scheduler:
 
         return scheduler
 
-    
+
+    def CosinWarmup(self, optimizer, start_factor, end_factor, total_iters):
+        lambda_cos = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters)  if epoch <= total_iters else 0.5 * (1 + torch.cos(math.pi * (epoch - total_iters) / (self.args.epochs - total_iters)))
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda_cos)
+
+        return scheduler
+
+
     def learning_rate_planner(self, optimizer, epoch):
         """Sets the learning rate to the initial LR decayed by 10"""
         decay = 0
