@@ -27,6 +27,13 @@ def main():
     arg_parser = ArgumentParser()
     args = arg_parser.parse_args()
 
+    if torch.cuda.is_available():
+        ngpus_per_node = torch.cuda.device_count()
+    elif torch.backends.mps.is_available():
+        raise ValueError("If you want to enable training on MacOS, set device = torch.device('mps') in the main_worker().")
+    else:
+        raise ValueError("torch.cuda.device_count() returns False. Please check CUDA status.")
+
     if args.seed is not None:
         random.seed(args.seed)
         torch.manual_seed(args.seed)
@@ -47,10 +54,7 @@ def main():
 
     args.distributed = args.world_size > 1 or args.multiprocessing_distributed
 
-    if torch.cuda.is_available():
-        ngpus_per_node = torch.cuda.device_count()
-    else:
-        ngpus_per_node = 1
+
     if args.multiprocessing_distributed:
         # Since we have ngpus_per_node processes per node, the total world_size
         # needs to be adjusted accordingly
@@ -88,15 +92,10 @@ def main_worker(gpu, ngpus_per_node, args):
     modeling = Model(args)
     model = modeling.create(ngpus_per_node)
 
-    if torch.cuda.is_available():
-        if args.gpu:
-            device = torch.device('cuda:{}'.format(args.gpu))
-        else:
-            device = torch.device("cuda")
-    elif torch.backends.mps.is_available():
-        device = torch.device("mps")
+    if args.gpu:
+        device = torch.device('cuda:{}'.format(args.gpu))
     else:
-        device = torch.device("cpu")
+        device = torch.device("cuda")
 
     # watch gradients only for rank 0
     wanlog.watch(model)
