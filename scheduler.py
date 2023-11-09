@@ -1,3 +1,4 @@
+import math
 import torch
 from torch.optim.lr_scheduler import LinearLR
 from torch.optim.lr_scheduler import MultiStepLR
@@ -44,7 +45,7 @@ class Scheduler:
 
 
     def CosinWarmup(self, optimizer, start_factor, end_factor, total_iters):
-        lambda_cos = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters)  if epoch <= total_iters else 0.5 * (1 + torch.cos(math.pi * (epoch - total_iters) / (self.args.epochs - total_iters)))
+        lambda_cos = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters)  if epoch <= total_iters else 0.5 * (1 + math.cos(math.pi * (epoch - total_iters) / (self.args.epochs - total_iters)))
         scheduler = LambdaLR(optimizer, lr_lambda=lambda_cos)
 
         return scheduler
