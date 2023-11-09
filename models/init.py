@@ -26,7 +26,8 @@ class Model:
             # DistributedDataParallel will use all available devices.
             if self.args.gpu is not None:
                 print('args.gpu:::::::', self.args.gpu)
-                torch.cuda.device(self.args.gpu)
+                torch.cuda.set_device(self.args.gpu)
+                # Do not use `torch.cuda.device(self.args.gpu)`, otherwise will lead to NCCL Errors.
                 model.cuda(self.args.gpu)
                 # When using a single GPU per process and per
                 # DistributedDataParallel, we need to divide the batch size
@@ -49,7 +50,8 @@ class Model:
                 # available GPUs if device_ids are not set
                 model = torch.nn.parallel.DistributedDataParallel(model)
         elif self.args.gpu is not None and torch.cuda.is_available():
-            torch.cuda.device(self.args.gpu)
+            torch.cuda.set_device(self.args.gpu)
+            # Do not use `torch.cuda.device(self.args.gpu)`, otherwise will lead to NCCL Errors.
             model = model.cuda(self.args.gpu)
         else:
             # DataParallel will divide and allocate batch_size to all available GPUs
