@@ -110,7 +110,7 @@ def main_worker(gpu, ngpus_per_node, args):
     
     # define learning rate scheduler
     scheduling = Scheduler("CosWarmup", args)
-    scheduler = scheduling.create(optimizer, start_factor=0.1/self.args.lr, total_iters=5)
+    scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
     
     # optionally resume from a checkpoint
     checkpoints = Checkpoints(args)
