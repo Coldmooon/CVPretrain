@@ -16,7 +16,7 @@ from opts import ArgumentParser
 from datasets import dataloader as Dataloader
 from train import Trainer
 from checkpoints import Checkpoints
-from models.init import Model
+from model import Model
 from scheduler import Scheduler
 from utils import logger
 

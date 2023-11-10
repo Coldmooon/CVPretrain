@@ -1,5 +1,6 @@
 import torch
-import torchvision.models as models
+import models
+
 
 class Model:
     def __init__(self, args):
