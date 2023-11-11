@@ -41,6 +41,21 @@ def conv1x1(in_planes: int, out_planes: int, stride: int = 1) -> nn.Conv2d:
     return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
 
 
+def conv_downsample(inplanes, out_planes, norm_layer):
+    return nn.Sequential(
+        conv1x1(inplanes, out_planes, stride=1),
+        norm_layer(out_planes),
+    )
+
+
+def pool_downsample(inplanes, out_planes, norm_layer):
+    return nn.Sequential(
+        nn.AvgPool2d(kernel_size=2, stride=2),
+        conv1x1(inplanes, out_planes, stride=1),
+        norm_layer(out_planes),
+    )   
+
+
 class BasicBlock(nn.Module):
     expansion: int = 1
 
@@ -179,7 +194,16 @@ class ResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
+        # Replace the original 7x7 conv1 with three 3x3 convolutions
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1, bias=False),  # First 3x3 conv, stride 2, 32 output channels
+            norm_layer(32),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False),  # Second 3x3 conv, stride 2, 32 output channels
+            norm_layer(32),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(32, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False),  # Third 3x3 conv, stride 1, 64 output channels
+        )
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
@@ -221,15 +245,10 @@ class ResNet(nn.Module):
         if dilate:
             self.dilation *= stride
             stride = 1
-        if stride != 1 or self.inplanes != planes * block.expansion:
-            # downsample = nn.Sequential(
-            #     conv1x1(self.inplanes, planes * block.expansion, stride),
-            #     norm_layer(planes * block.expansion),
-            # )
-            downsample = nn.Sequential(
-                nn.AvgPool2d(kernel_size=stride, stride=stride),
-                conv1x1(self.inplanes, planes * block.expansion, stride=1),
-            )   
+        if stride != 1:
+            downsample = pool_downsample(self.inplanes, planes * block.expansion, norm_layer)
+        elif self.inplanes != planes * block.expansion:
+            downsample = conv_downsample(self.inplanes, planes * block.expansion, norm_layer)
 
         layers = []
         layers.append(
