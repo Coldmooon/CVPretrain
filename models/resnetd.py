@@ -225,6 +225,7 @@ class ResNet(nn.Module):
         # so that the residual branch starts with zeros, and each residual block behaves like an identity.
         # This improves the model by 0.2~0.3% according to https://arxiv.org/abs/1706.02677
         if zero_init_residual:
+            print("------------------ Enable zero_init_residual for the last of BN of a Block ----------------")
             for m in self.modules():
                 if isinstance(m, Bottleneck) and m.bn3.weight is not None:
                     nn.init.constant_(m.bn3.weight, 0)  # type: ignore[arg-type]
@@ -357,7 +358,7 @@ def resnet50d(*, progress: bool = True, **kwargs: Any) -> ResNet:
     """
     print("----------------- Using ResNet50-D -----------------------")
 
-    return _resnet(Bottleneck, [3, 4, 6, 3], progress, **kwargs)
+    return _resnet(Bottleneck, [3, 4, 6, 3], progress, zero_init_residual=True, **kwargs)
 
 
 @register_model()
