@@ -92,6 +92,26 @@ def main_worker(gpu, ngpus_per_node, args):
     modeling = Model(args)
     model = modeling.create(ngpus_per_node)
 
+    # Separate parameters into groups
+    weight_params = []
+    bias_params = []
+    bn_params = []
+
+    for name, param in model.named_parameters():
+        if 'weight' in name and ('conv' in name or 'fc' in name):
+            weight_params.append(param)
+        elif 'bias' in name:
+            bias_params.append(param)
+        elif 'bn' in name:
+            bn_params.append(param)
+
+    # No Bias/BN Decay: define separate parameter groups with specific regularization
+    params = [
+        {'params': weight_params, 'weight_decay': args.weight_decay},  # Apply weight decay to weights of conv and fc layers
+        {'params': bias_params, 'weight_decay': 0},              # No weight decay for biases
+        {'params': bn_params, 'weight_decay': 0},                # No weight decay for batch norm parameters
+    ]
+
     if args.gpu:
         device = torch.device('cuda:{}'.format(args.gpu))
     else:
@@ -104,10 +124,8 @@ def main_worker(gpu, ngpus_per_node, args):
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
     
     # define optimizer
-    optimizer = torch.optim.SGD(model.parameters(), args.lr,
-                                momentum=args.momentum,
-                                weight_decay=args.weight_decay)
-    
+    optimizer = torch.optim.SGD(params, args.lr, momentum=args.momentum)
+
     # define learning rate scheduler
     scheduling = Scheduler("CosWarmup", args)
     scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
