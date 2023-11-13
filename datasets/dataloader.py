@@ -7,8 +7,10 @@ import torchvision.transforms as transforms
 try:
     from nvidia.dali.plugin.pytorch import DALIClassificationIterator, LastBatchPolicy
     from nvidia.dali.pipeline import pipeline_def
+    from nvidia.dali.pipeline import Pipeline
     import nvidia.dali.types as types
     import nvidia.dali.fn as fn
+
 except ImportError:
     raise ImportError("Please install DALI from https://www.github.com/NVIDIA/DALI to run this example.")
 
@@ -130,6 +132,59 @@ def create_dali_pipeline(data_dir, crop, size, shard_id, num_shards, dali_cpu=Fa
     labels = labels.gpu()
     return images, labels
 
+
+def create_dali_train_pipeline(batch_size, num_threads, device_id, num_shards, data_dir):
+    pipeline = Pipeline(batch_size, num_threads, device_id)
+    with pipeline:
+        images, labels = fn.readers.file(file_root=data_dir,
+                                        shard_id=device_id,
+                                        num_shards=num_shards,
+                                        random_shuffle=True,
+                                        pad_last_batch=True,
+                                        name="Reader")
+        images = fn.decoders.image(images, device="mixed", output_type=types.RGB)
+        images = fn.random_resized_crop(images, size=224, random_area=[0.08, 1.0], random_aspect_ratio=[0.75, 1.33])
+        images = fn.flip(images, horizontal=fn.random.coin_flip(probability=0.5))
+        images = fn.color_twist(images, hue=fn.random.uniform(range=[0.6, 1.4]), 
+                                saturation=fn.random.uniform(range=[0.6, 1.4]), 
+                                brightness=fn.random.uniform(range=[0.6, 1.4]))
+        images = fn.noise.gaussian(images, stddev=fn.random.normal(mean=0, stddev=0.1))
+        images = fn.crop_mirror_normalize(images,
+                                        crop=(224, 224),
+                                        output_layout="CHW",
+                                        mean=[123.68, 116.779, 103.939],
+                                        std=[58.393, 57.12, 57.375],
+                                        mirror=0,
+                                        dtype=types.FLOAT)
+        labels = labels.gpu()
+        pipeline.set_outputs(images, labels)
+    return pipeline
+
+
+def create_dali_val_pipeline(batch_size, num_threads, device_id, num_shards, data_dir):
+    pipeline = Pipeline(batch_size, num_threads, device_id)
+    with pipeline:
+        images, labels = fn.readers.file(file_root=data_dir,
+                                        shard_id=device_id,
+                                        num_shards=num_shards,
+                                        random_shuffle=False,
+                                        pad_last_batch=True,
+                                        name="Reader")
+        images = fn.decoders.image(images, device="mixed", output_type=types.RGB)
+        images = fn.resize(images, resize_shorter=256)
+        # images = fn.crop(images, crop=224, crop_pos_x=0.5, crop_pos_y=0.5)
+        images = fn.crop_mirror_normalize(images,
+                                  crop=(224, 224),
+                                  output_layout="CHW",
+                                  mean=[123.68, 116.779, 103.939],
+                                  std=[58.393, 57.12, 57.375],
+                                  mirror=0,
+                                  dtype=types.FLOAT)
+        labels = labels.gpu()
+        pipeline.set_outputs(images, labels)
+    return pipeline
+
+
 # Data loading code
 def dataloader(args):
     if args.dummy:
@@ -140,34 +195,37 @@ def dataloader(args):
         traindir = os.path.join(args.data, 'train')
         valdir = os.path.join(args.data, 'val')
         
-        train_pipe = create_dali_pipeline(batch_size=args.batch_size,
-                                          num_threads=args.workers,
-                                          device_id=args.rank,
-                                          seed=12 + args.rank,
-                                          data_dir=traindir,
-                                          crop=224,
-                                          size=256,
-                                          dali_cpu=False,
-                                          shard_id=args.rank,
-                                          num_shards=args.world_size,
-                                          is_training=True)
+        # train_pipe = create_dali_pipeline(batch_size=args.batch_size,
+        #                                   num_threads=args.workers,
+        #                                   device_id=args.rank,
+        #                                   seed=12 + args.rank,
+        #                                   data_dir=traindir,
+        #                                   crop=224,
+        #                                   size=256,
+        #                                   dali_cpu=False,
+        #                                   shard_id=args.rank,
+        #                                   num_shards=args.world_size,
+        #                                   is_training=True)        
+        # Create and build the validation pipeline
+        train_pipe = create_dali_train_pipeline(args.batch_size, args.workers, args.rank, args.world_size, traindir)
         train_pipe.build()
         train_loader = DALIClassificationIterator(train_pipe, reader_name="Reader",
                                                   last_batch_policy=LastBatchPolicy.PARTIAL,
                                                   auto_reset=True)
 
-
-        val_pipe = create_dali_pipeline(batch_size=args.batch_size,
-                                        num_threads=args.workers,
-                                        device_id=args.rank,
-                                        seed=12 + args.rank,
-                                        data_dir=valdir,
-                                        crop=224,
-                                        size=256,
-                                        dali_cpu=False,
-                                        shard_id=args.rank,
-                                        num_shards=args.world_size,
-                                        is_training=False)
+        # val_pipe = create_dali_pipeline(batch_size=args.batch_size,
+        #                                 num_threads=args.workers,
+        #                                 device_id=args.rank,
+        #                                 seed=12 + args.rank,
+        #                                 data_dir=valdir,
+        #                                 crop=224,
+        #                                 size=256,
+        #                                 dali_cpu=False,
+        #                                 shard_id=args.rank,
+        #                                 num_shards=args.world_size,
+        #                                 is_training=False)
+        
+        val_pipe = create_dali_val_pipeline(args.batch_size, args.workers, args.rank, args.world_size, valdir)
         val_pipe.build()
         val_loader = DALIClassificationIterator(val_pipe, reader_name="Reader",
                                                 last_batch_policy=LastBatchPolicy.PARTIAL,
