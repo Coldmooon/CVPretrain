@@ -196,13 +196,13 @@ class ResNet(nn.Module):
         self.base_width = width_per_group
         # Replace the original 7x7 conv1 with three 3x3 convolutions
         self.conv1 = nn.Sequential(
-            nn.Conv2d(3, 32, kernel_size=3, stride=2, padding=1, bias=False),  # First 3x3 conv, stride 2, 32 output channels
+            conv3x3(3, 32, 2),
             norm_layer(32),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 32, kernel_size=3, stride=1, padding=1, bias=False),  # Second 3x3 conv, stride 2, 32 output channels
+            conv3x3(32, 32, 1),
             norm_layer(32),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False),  # Third 3x3 conv, stride 1, 64 output channels
+            conv3x3(32, self.inplanes, 1)
         )
         self.bn1 = norm_layer(self.inplanes)
         self.relu = nn.ReLU(inplace=True)
