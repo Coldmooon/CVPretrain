@@ -10,6 +10,8 @@ class wanlog:
         if self.args.rank == 0:
             run = wandb.init(
                 project="pytorch.examples.ddp",
+                notes = self.args.notes,
+                tags = None,
                 config={
                         "architecture": self.args.arch,
                         "learning_rate": self.args.lr,

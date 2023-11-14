@@ -68,6 +68,8 @@ class ArgumentParser:
                             help='Disable DALI data loader and use native PyTorch one instead.')
         self.parser.add_argument('--ls', '--label-smoothing', default=0.0, type=float, dest='label_smoothing',
                             help='label smoothing')
+        self.parser.add_argument('--note', default='', type=str, metavar='DESCRIPTION',
+                            help='A description of an experiment run.')
 
     def parse_args(self):
         return self.parser.parse_args()
