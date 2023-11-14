@@ -1,9 +1,23 @@
 import wandb
 
-class wanlog:
+class Wanlog:
     def __init__(self, args, ngpus_per_node):
         self.args = args
         self.run = self.setup(ngpus_per_node)
+    
+    def watch(self, model):
+        if self.run is not None:
+            self.run.watch(model)
+
+
+    def log(self, info):
+        if self.run is not None:
+            self.run.log(info)
+
+    
+    def finish(self):
+        if self.run is not None:
+            self.run.finish()
 
     def setup(self, ngpus_per_node):
         run = None
@@ -28,17 +42,15 @@ class wanlog:
                 )
 
         return run
-    
-    def watch(self, model):
-        if self.run is not None:
-            self.run.watch(model)
 
 
-    def log(self, info):
-        if self.run is not None:
-            self.run.log(info)
+class Logger:
+    def __init__(self, args, ngpus_per_node, logsystem='wandb'):
+        self.args = args
+        self.logger = self.setlogger(ngpus_per_node, logsystem)
 
-    
-    def finish(self):
-        if self.run is not None:
-            self.run.finish()
+    def setlogger(self, ngpus_per_node, logsystem):
+        if (logsystem == 'wandb'):
+            return Wanlog(self.args, ngpus_per_node)
+
+        return None

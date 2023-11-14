@@ -87,7 +87,8 @@ def main_worker(gpu, ngpus_per_node, args):
                                 world_size=args.world_size, rank=args.rank)
 
     # setup logger
-    wanlog = logger.wanlog(args, ngpus_per_node)
+    wanlog = logger.Logger(args, ngpus_per_node)
+    wanlog = wanlog.logger
 
     # create modle
     modeling = Model(args)
