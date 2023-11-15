@@ -135,6 +135,12 @@ def create_dali_pipeline(data_dir, crop, size, shard_id, num_shards, dali_cpu=Fa
 
 def create_dali_train_pipeline(batch_size, num_threads, device_id, num_shards, data_dir):
     pipeline = Pipeline(batch_size, num_threads, device_id)
+    # ask nvJPEG to preallocate memory for the biggest sample in ImageNet for CPU and GPU to avoid reallocations in runtime
+    device_memory_padding = 211025920
+    host_memory_padding = 140544512
+    # ask HW NVJPEG to allocate memory ahead for the biggest image in the data set to avoid reallocations in runtime
+    preallocate_width_hint = 5980
+    preallocate_height_hint = 6430
     with pipeline:
         images, labels = fn.readers.file(file_root=data_dir,
                                         shard_id=device_id,
@@ -142,7 +148,13 @@ def create_dali_train_pipeline(batch_size, num_threads, device_id, num_shards, d
                                         random_shuffle=True,
                                         pad_last_batch=True,
                                         name="Reader")
-        images = fn.decoders.image(images, device="mixed", output_type=types.RGB)
+        images = fn.decoders.image(images, 
+                                   device_memory_padding=device_memory_padding,
+                                   host_memory_padding=host_memory_padding,
+                                   preallocate_width_hint=preallocate_width_hint,
+                                   preallocate_height_hint=preallocate_height_hint,
+                                   device="mixed", 
+                                   output_type=types.RGB)
         images = fn.random_resized_crop(images, size=224, random_area=[0.08, 1.0], random_aspect_ratio=[0.75, 1.33])
         images = fn.flip(images, horizontal=fn.random.coin_flip(probability=0.5))
         images = fn.color_twist(images, hue=fn.random.uniform(range=[0.6, 1.4]), 
