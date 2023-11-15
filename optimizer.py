@@ -7,12 +7,17 @@ class Optimizers():
         self.args = args
 
 
-    def create(self, model):
-        params = self.configure_optimizers(model)
-        return torch.optim.SGD(params, self.args.lr, momentum=self.args.momentum)
+    def create(self, model, policy='no_bias_norm_decay'):
+        if policy == 'regular':
+            return torch.optim.SGD(model.parameters(), self.args.lr,
+                                   momentum=self.args.momentum,
+                                   weight_decay=self.args.weight_decay)
+        elif policy == 'no_bias_norm_decay':
+            params = self.no_bias_bn_decay(model)
+            return torch.optim.SGD(params, self.args.lr, momentum=self.args.momentum)
 
 
-    def configure_optimizers_simple(self, model):
+    def no_bias_norm_decay_simple(self, model):
         # Separate parameters into groups
         weight_params = []
         bias_params = []
@@ -37,7 +42,7 @@ class Optimizers():
 
 
     # modified from https://github.com/karpathy/minGPT/blob/3ed14b2cec0dfdad3f4b2831f2b4a86d11aef150/mingpt/model.py#L136
-    def configure_optimizers(self, model):
+    def no_bias_norm_decay(self, model):
         """
         This long function is unfortunately doing something very simple and is being very defensive:
         We are separating out all parameters of the model into two buckets: those that will experience
