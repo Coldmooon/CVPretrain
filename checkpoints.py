@@ -9,7 +9,6 @@ class Checkpoints:
 
     def resume(self, model, optimizer, scheduler):
         # optionally resume from a checkpoint
-        best_acc1 = 0
         if self.args.resume:
             if os.path.isfile(self.args.resume):
                 print("=> loading checkpoint '{}'".format(self.args.resume))
@@ -23,18 +22,20 @@ class Checkpoints:
                 best_acc1 = checkpoint['best_acc1']
                 if self.args.gpu is not None:
                     # best_acc1 may be from a checkpoint from a different GPU
+                    # best_acc1 should be a torch.Tensor since it is loaded by torch.load().
                     best_acc1 = best_acc1.to(self.args.gpu)
                 model.load_state_dict(checkpoint['state_dict'])
                 optimizer.load_state_dict(checkpoint['optimizer'])
                 scheduler.load_state_dict(checkpoint['scheduler'])
                 print("=> loaded checkpoint '{}' (epoch {})"
                     .format(self.args.resume, checkpoint['epoch']))
+                return best_acc1
             else:
                 print("=> no checkpoint found at '{}'".format(self.args.resume))
         else:
             print("=> args.resume: False. Train from scratch ...")
 
-        return best_acc1
+        return 0
 
 
     def save(self, state, is_best=None, filename='checkpoint.pth.tar'):
