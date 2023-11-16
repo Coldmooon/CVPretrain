@@ -168,6 +168,7 @@ def create_dali_train_pipeline(batch_size, num_threads, device_id, num_shards, d
                                         std=[58.393, 57.12, 57.375],
                                         mirror=0,
                                         dtype=types.FLOAT)
+        # images = fn.normalize(images, batch=True, mean=[[[123.68, 116.779, 103.939]]], stddev=[[[58.393, 57.12, 57.375]]], axes=[1], dtype=types.FLOAT)
         labels = labels.gpu()
         pipeline.set_outputs(images, labels)
     return pipeline
@@ -184,7 +185,7 @@ def create_dali_val_pipeline(batch_size, num_threads, device_id, num_shards, dat
                                         name="Reader")
         images = fn.decoders.image(images, device="mixed", output_type=types.RGB)
         images = fn.resize(images, resize_shorter=256)
-        # images = fn.crop(images, crop=224, crop_pos_x=0.5, crop_pos_y=0.5)
+        # images = fn.crop(images, crop=(224, 224), crop_pos_x=0.5, crop_pos_y=0.5)
         images = fn.crop_mirror_normalize(images,
                                   crop=(224, 224),
                                   output_layout="CHW",
