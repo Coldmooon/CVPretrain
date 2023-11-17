@@ -13,7 +13,7 @@ class Optimizers():
                                    momentum=self.args.momentum,
                                    weight_decay=self.args.weight_decay)
         elif policy == 'no_bias_norm_decay':
-            params = self.no_bias_bn_decay(model)
+            params = self.no_bias_norm_decay(model)
             return torch.optim.SGD(params, self.args.lr, momentum=self.args.momentum)
 
 
