@@ -68,8 +68,10 @@ class ArgumentParser:
                             help='Disable DALI data loader and use native PyTorch one instead.')
         self.parser.add_argument('--ls', '--label-smoothing', default=0.0, type=float, dest='label_smoothing',
                             help='label smoothing')
-        self.parser.add_argument('--notes', default='', type=str, metavar='DESCRIPTION',
-                            help='A description of an experiment run.')
+        self.parser.add_argument('--notes', metavar='DESCRIPTION', type=lambda s: {k:v for k,v in (i.split(':') for i in s.split(','))}, 
+                            help="Comma-separated 'key:value' pairs, e.g. 'project_name:MyProject, notes:Some notes'")
+        self.parser.add_argument('--logid', metavar='LOG_ID', type=str, 
+                            help="A Wandb Run ID, e.g., sozupknt ")
 
     def parse_args(self):
         return self.parser.parse_args()

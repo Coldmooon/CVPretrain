@@ -174,7 +174,7 @@ class Trainer:
             # Print the progress every print_freq batches
             if i % self.args.print_freq == 0:
                 progress.display(i)
-            if logger is not None:
+            if i % self.args.print_freq == 0 and logger is not None:
                 logger.log({"data_time": data_time.val, "batch_loss": losses.avg, "batch_time": batch_time.val, "top1.train":top1.avg, "top5.train":top5.avg})
 
 

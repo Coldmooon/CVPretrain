@@ -86,10 +86,6 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
 
-    # setup logger
-    wanlog = logger.Logger(args, ngpus_per_node)
-    wanlog = wanlog.logger
-
     # create modle
     modeling = Model(args)
     model = modeling.create(ngpus_per_node)
@@ -98,9 +94,6 @@ def main_worker(gpu, ngpus_per_node, args):
         device = torch.device('cuda:{}'.format(args.gpu))
     else:
         device = torch.device("cuda")
-
-    # watch gradients only for rank 0
-    wanlog.watch(model)
 
     # define loss function (criterion)
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
@@ -127,6 +120,10 @@ def main_worker(gpu, ngpus_per_node, args):
         Training.validate(val_loader)
         return
 
+    # setup logger for rank 0
+    wanlog = logger.Logger(args, model, ngpus_per_node)
+    wanlog = wanlog.logger
+
     wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
     is_best = None
@@ -148,7 +145,7 @@ def main_worker(gpu, ngpus_per_node, args):
         best_acc1 = max(acc1, best_acc1)
         best_acc5 = max(acc5, best_acc5)
 
-        wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"], "top1.val": best_acc1, "top5.val": best_acc5})
+        wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"], "epoch": epoch, "top1.val": best_acc1, "top5.val": best_acc5})
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):

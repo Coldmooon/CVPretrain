@@ -1,12 +1,15 @@
 import wandb
 
 class Wanlog:
-    def __init__(self, args, ngpus_per_node):
+    def __init__(self, args, model, ngpus_per_node):
         self.args = args
+        self.watch_gradients = False
         self.run = self.setup(ngpus_per_node)
-    
+        self.watch(model)  # watch gradients only for rank 0
+
+
     def watch(self, model):
-        if self.run is not None:
+        if self.run is not None and self.watch_gradients:
             self.run.watch(model)
 
 
@@ -19,13 +22,16 @@ class Wanlog:
         if self.run is not None:
             self.run.finish()
 
+
     def setup(self, ngpus_per_node):
         run = None
         if self.args.rank == 0:
             run = wandb.init(
-                project="pytorch.examples.ddp",
-                notes = self.args.notes,
+                project= self.args.notes and self.args.notes.get('project_name') or "pytorch.examples.ddp",
+                notes = self.args.notes and self.args.notes.get('notes') or None,
                 tags = None,
+                resume = self.args.resume and True or None,
+                id = self.args.resume and self.args.logid or wandb.util.generate_id(),
                 config={
                         "architecture": self.args.arch,
                         "learning_rate": self.args.lr,
@@ -45,12 +51,13 @@ class Wanlog:
 
 
 class Logger:
-    def __init__(self, args, ngpus_per_node, logsystem='wandb'):
+    def __init__(self, args, model, ngpus_per_node, logsystem='wandb'):
         self.args = args
-        self.logger = self.setlogger(ngpus_per_node, logsystem)
+        self.logger = self.setlogger(model, ngpus_per_node, logsystem)
 
-    def setlogger(self, ngpus_per_node, logsystem):
+
+    def setlogger(self, model, ngpus_per_node, logsystem):
         if (logsystem == 'wandb'):
-            return Wanlog(self.args, ngpus_per_node)
+            return Wanlog(self.args, model, ngpus_per_node)
 
         return None
