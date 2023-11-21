@@ -41,20 +41,26 @@ class Checkpoints:
 
 
     def save(self, state, is_best=None, logger=None, filename='checkpoint.pth.tar'):
-        current_date = datetime.date.today().strftime("%m_%d_%Y") 
-        description = self.args.arch + "_" + \
-                      self.args.lr + "_" + \
-                      self.args.epochs + "_" + \
-                      self.args.batch_size * torch.cuda.device_count()       
-        project = logger and '/' + logger.project or ""
-        note = logger and logger.notes or ""
-        dataset = logger and logger.config['dataset'] or ""
-        savefolder = description + '_' + dataset + '_' + note + '_' + current_date
-        
-        savepath = 'checkpoints' + project + '/' + savefolder
-        filename = savepath + '/' + filename
-        if not os.path.isdir(savepath):
-            os.makedirs(savepath)
+        current_date = datetime.datetime.now().strftime("%H%M_%m%d%Y")
+        description = f"{self.args.arch}_lr{self.args.lr}_epoch{self.args.epochs}_bs{self.args.batch_size * torch.cuda.device_count()}"
+
+        project = logger.run.project.replace(' ', '_') if logger and logger.run and logger.run.project else ""
+        note = logger.run.notes.replace(' ', '_') if logger and logger.run and logger.run.notes else ""
+        dataset = logger.run.config['dataset'].replace(' ', '_') if logger and logger.run and logger.run.config.get('dataset') else ""
+
+        components = [description, dataset, note, current_date]
+        components = [c for c in components if c]
+
+        savefolder = '_'.join(components)
+
+        # Use os.path.join to concatenate paths
+        savepath = os.path.join('checkpoints', project, savefolder)
+        filename = os.path.join(savepath, filename)
+
+        print(savepath)
+        print(filename)
+        # Create the directory if it doesn't exist
+        os.makedirs(savepath, exist_ok=True)
         torch.save(state, filename)
         if is_best:
-            shutil.copyfile(filename, savepath + '/' + 'model_best.pth.tar')
+            shutil.copyfile(filename, os.path.join(savepath, 'model_best.pth.tar'))

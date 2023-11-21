@@ -27,8 +27,8 @@ class Wanlog:
         run = None
         if self.args.rank == 0:
             run = wandb.init(
-                project= self.args.notes and self.args.notes.get('project_name') or "pytorch.examples.ddp",
-                notes = self.args.notes and self.args.notes.get('notes') or None,
+                project = self.args.notes.get('project_name') if self.args.notes and 'project_name' in self.args.notes else "pytorch.examples.ddp",
+                notes = self.args.notes.get('notes') if self.args.notes and 'notes' in self.args.notes else '',
                 tags = None,
                 resume = self.args.resume and True or None,
                 id = self.args.resume and self.args.logid or wandb.util.generate_id(),
@@ -38,7 +38,7 @@ class Wanlog:
                         "label_smoothing": self.args.label_smoothing,
                         "epochs": self.args.epochs,
                         "batch_size": self.args.batch_size * ngpus_per_node,
-                        "dataset": "ImageNet 2012",
+                        "dataset": "imagenet",
                         "num_workers": self.args.workers * ngpus_per_node,
                         "num_gpus": self.args.world_size,
                         "world-size": self.args.world_size / ngpus_per_node,

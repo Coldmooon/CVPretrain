@@ -127,6 +127,11 @@ def main_worker(gpu, ngpus_per_node, args):
     wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
     is_best = None
+    checkpoints.save({
+                'state_dict': model.state_dict(),
+                'optimizer' : optimizer.state_dict(),
+                'scheduler' : scheduler.state_dict()
+            }, is_best, wanlog)
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed and args.disable_dali:
             # train_sampler.set_epoch(epoch)
