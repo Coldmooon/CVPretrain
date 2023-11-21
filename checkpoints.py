@@ -4,8 +4,22 @@ import os
 import datetime
 
 class Checkpoints:
-    def __init__(self, args):
+    def __init__(self, args, logger):
         self.args = args
+        self.savepath = self.setpath(logger)
+        os.makedirs(self.savepath, exist_ok=True)
+        os.makedirs(os.path.join(self.savepath, 'datasets'), exist_ok=True)
+        os.makedirs(os.path.join(self.savepath, 'models'), exist_ok=True)
+        self.experiment_files(['main.py', 
+                               'model.py', 
+                               'train.py', 
+                               'opts.py', 
+                               'optimizer.py', 
+                               'scheduler.py', 
+                               'models/resnetd.py',
+                               'datasets/dataloader.py',
+                               'datasets/transforms.py'
+                               ])
 
 
     def resume(self, model, optimizer, scheduler):
@@ -40,27 +54,36 @@ class Checkpoints:
         return 0
 
 
-    def save(self, state, is_best=None, logger=None, filename='checkpoint.pth.tar'):
+    def setpath(self, logger=None):
+
         current_date = datetime.datetime.now().strftime("%H%M_%m%d%Y")
-        description = f"{self.args.arch}_lr{self.args.lr}_epoch{self.args.epochs}_bs{self.args.batch_size * torch.cuda.device_count()}"
-
-        project = logger.run.project.replace(' ', '_') if logger and logger.run and logger.run.project else ""
-        note = logger.run.notes.replace(' ', '_') if logger and logger.run and logger.run.notes else ""
+        hyper_parameters = f"{self.args.arch}_lr{self.args.lr}_epoch{self.args.epochs}_bs{self.args.batch_size * torch.cuda.device_count()}"
         dataset = logger.run.config['dataset'].replace(' ', '_') if logger and logger.run and logger.run.config.get('dataset') else ""
+        project_path = logger.run.project.replace(' ', '_') if logger and logger.run and logger.run.project else "project.new.pytorch"
+        description = logger.run.notes.replace(' ', '_') if logger and logger.run and logger.run.notes else ""
 
-        components = [description, dataset, note, current_date]
+        components = [hyper_parameters, dataset, description, current_date]
         components = [c for c in components if c]
 
-        savefolder = '_'.join(components)
+        experiment_path = '_'.join(components)
 
         # Use os.path.join to concatenate paths
-        savepath = os.path.join('checkpoints', project, savefolder)
-        filename = os.path.join(savepath, filename)
+        savepath = os.path.join('checkpoints', project_path, experiment_path)
+        self.savepath = savepath
 
-        print(savepath)
-        print(filename)
-        # Create the directory if it doesn't exist
-        os.makedirs(savepath, exist_ok=True)
+        return savepath
+
+
+    def experiment_files(self, filelist):
+
+        for file in filelist:
+            shutil.copyfile(file, os.path.join(self.savepath, file))
+
+
+    
+    def save(self, state, is_best, filename='checkpoint.pth.tar'):
+        
+        filename = os.path.join(self.savepath, filename)
         torch.save(state, filename)
         if is_best:
-            shutil.copyfile(filename, os.path.join(savepath, 'model_best.pth.tar'))
+            shutil.copyfile(filename, os.path.join(self.savepath, 'model_best.pth.tar'))

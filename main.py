@@ -105,10 +105,6 @@ def main_worker(gpu, ngpus_per_node, args):
     # define learning rate scheduler
     scheduling = Scheduler("CosWarmup", args)
     scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
-    
-    # optionally resume from a checkpoint
-    checkpoints = Checkpoints(args)
-    best_acc1 = checkpoints.resume(model, optimizer, scheduler)
 
     # define dataloader
     train_loader, val_loader = Dataloader.dataloader(args)
@@ -123,6 +119,10 @@ def main_worker(gpu, ngpus_per_node, args):
     # setup logger for rank 0
     wanlog = logger.Logger(args, model, ngpus_per_node)
     wanlog = wanlog.logger
+    
+    # optionally resume from a checkpoint
+    checkpoints = Checkpoints(args, wanlog)
+    best_acc1 = checkpoints.resume(model, optimizer, scheduler)
 
     wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
@@ -131,7 +131,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'state_dict': model.state_dict(),
                 'optimizer' : optimizer.state_dict(),
                 'scheduler' : scheduler.state_dict()
-            }, is_best, wanlog)
+            }, is_best)
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed and args.disable_dali:
             # train_sampler.set_epoch(epoch)
