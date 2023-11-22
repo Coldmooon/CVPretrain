@@ -20,7 +20,7 @@ class WarmupLR(LinearLR):
 
 
 class Scheduler:
-    def __init__(self, lr_policy, args):
+    def __init__(self, args, lr_policy='CosWarmup'):
         self.lr_policy = lr_policy
         self.args = args
 

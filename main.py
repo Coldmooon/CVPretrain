@@ -100,10 +100,10 @@ def main_worker(gpu, ngpus_per_node, args):
     
     # define optimizer
     optimzers = Optimizers(args)
-    optimizer = optimzers.create(model)
+    optimizer = optimzers.create(model, policy='regular')
 
     # define learning rate scheduler
-    scheduling = Scheduler("CosWarmup", args)
+    scheduling = Scheduler(args, lr_policy='CosWarmup')
     scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
 
     # define dataloader
@@ -161,7 +161,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'best_acc1': best_acc1,
                 'optimizer' : optimizer.state_dict(),
                 'scheduler' : scheduler.state_dict()
-            }, is_best, wanlog)
+            }, is_best)
     
     wanlog.finish()
 
