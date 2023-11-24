@@ -70,7 +70,9 @@ class ArgumentParser:
                             help='label smoothing')
         self.parser.add_argument('--notes', metavar='DESCRIPTION', type=lambda s: {k:v for k,v in (i.split(':') for i in s.split(','))}, 
                             help="Comma-separated 'key:value' pairs, e.g. 'project_name:MyProject,notes:Some notes'")
-        self.parser.add_argument('--logid', metavar='LOG_ID', type=str, 
+        self.parser.add_argument('--logsys', metavar='LOG_SYSTEM', type=str,
+                            help="Select log system, e.g., wandb or None")        
+        self.parser.add_argument('--log-id', metavar='LOG_ID', type=str, 
                             help="A Wandb Run ID, e.g., sozupknt ")
 
     def parse_args(self):

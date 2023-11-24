@@ -58,9 +58,9 @@ class Checkpoints:
 
         current_date = datetime.datetime.now().strftime("%H%M_%m%d%Y")
         hyper_parameters = f"{self.args.arch}_lr{self.args.lr}_epoch{self.args.epochs}_bs{self.args.batch_size * torch.cuda.device_count()}"
-        dataset = logger.run.config['dataset'].replace(' ', '_') if logger and logger.run and logger.run.config.get('dataset') else ""
-        project_path = logger.run.project.replace(' ', '_') if logger and logger.run and logger.run.project else "project.new.pytorch"
-        description = logger.run.notes.replace(' ', '_') if logger and logger.run and logger.run.notes else ""
+        dataset = logger.config['dataset'].replace(' ', '_') if logger and logger.config.get('dataset') else ""
+        project_path = logger.project.replace(' ', '_') if logger and logger.project else "project.new.pytorch"
+        description = logger.notes.replace(' ', '_') if logger and logger.notes else ""
 
         components = [hyper_parameters, dataset, description, current_date]
         components = [c for c in components if c]

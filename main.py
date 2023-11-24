@@ -19,7 +19,7 @@ from train import Trainer
 from checkpoints import Checkpoints
 from model import Model
 from scheduler import Scheduler
-from utils import logger
+from utils import logger as Log
 
 best_acc1 = 0
 best_acc5 = 0
@@ -117,14 +117,13 @@ def main_worker(gpu, ngpus_per_node, args):
         return
 
     # setup logger for rank 0
-    wanlog = logger.Logger(args, model, ngpus_per_node)
-    wanlog = wanlog.logger
+    logger = Log.Logger(args, model, ngpus_per_node)
     
     # optionally resume from a checkpoint
-    checkpoints = Checkpoints(args, wanlog)
+    checkpoints = Checkpoints(args, logger)
     best_acc1 = checkpoints.resume(model, optimizer, scheduler)
 
-    wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"]})
+    logger.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
     is_best = None
     checkpoints.save({
@@ -138,7 +137,7 @@ def main_worker(gpu, ngpus_per_node, args):
             train_loader.sampler.set_epoch(epoch)
 
         # train for one epoch
-        Training.train(train_loader, epoch, wanlog)
+        Training.train(train_loader, epoch, logger)
 
         # evaluate on validation set
         acc1, acc5 = Training.validate(val_loader)
@@ -150,7 +149,7 @@ def main_worker(gpu, ngpus_per_node, args):
         best_acc1 = max(acc1, best_acc1)
         best_acc5 = max(acc5, best_acc5)
 
-        wanlog.log({"learning_rate": optimizer.param_groups[0]["lr"], "epoch": epoch, "top1.val": best_acc1, "top5.val": best_acc5})
+        logger.log({"learning_rate": optimizer.param_groups[0]["lr"], "epoch": epoch, "top1.val": best_acc1, "top5.val": best_acc5})
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
@@ -163,7 +162,7 @@ def main_worker(gpu, ngpus_per_node, args):
                 'scheduler' : scheduler.state_dict()
             }, is_best)
     
-    wanlog.finish()
+    logger.finish()
 
 
 if __name__ == '__main__':
