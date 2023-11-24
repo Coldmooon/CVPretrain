@@ -68,7 +68,10 @@ class Optimizers():
                 elif pn.endswith('weight') and isinstance(m, blacklist_weight_modules):
                     # weights of blacklist modules will NOT be weight decayed
                     no_decay.add(fpn)
-
+                elif pn.endswith('alpha') or pn.endswith('beta'):
+                    # Parameters ending in 'alpha' or 'beta' will not be decayed
+                    no_decay.add(fpn)
+                    
         # special case the position embedding parameter in the root GPT module as not decayed
         # no_decay.add('pos_emb')
 
