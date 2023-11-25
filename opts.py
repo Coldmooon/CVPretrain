@@ -64,7 +64,7 @@ class ArgumentParser:
         self.parser.add_argument('--dummy', action='store_true', help="use fake data to benchmark")
         self.parser.add_argument('--compiled', default=0, type=int,
                             help='If use torch.compile, default is 0.')
-        self.parser.add_argument('--disable_dali', default=False, action='store_true',
+        self.parser.add_argument('--disable-dali', default=False, action='store_true', dest='disable_dali',
                             help='Disable DALI data loader and use native PyTorch one instead.')
         self.parser.add_argument('--ls', '--label-smoothing', default=0.0, type=float, dest='label_smoothing',
                             help='label smoothing')

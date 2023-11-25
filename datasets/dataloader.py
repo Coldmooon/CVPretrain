@@ -282,10 +282,4 @@ def dataloader(args):
             val_dataset, batch_size=args.batch_size, shuffle=False,
             num_workers=args.workers, pin_memory=True, sampler=val_sampler)
         
-        train_loader = data_prefetcher(train_loader)
-        train_loader = iter(train_loader)
-        val_loader   = data_prefetcher(val_loader)
-        val_loader   = iter(val_loader)
-
-
     return train_loader, val_loader
