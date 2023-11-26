@@ -123,8 +123,6 @@ def main_worker(gpu, ngpus_per_node, args):
     checkpoints = Checkpoints(args, logger)
     best_acc1 = checkpoints.resume(model, optimizer, scheduler)
 
-    logger.log({"learning_rate": optimizer.param_groups[0]["lr"]})
-
     is_best = None
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed and args.disable_dali:
@@ -137,14 +135,14 @@ def main_worker(gpu, ngpus_per_node, args):
         # evaluate on validation set
         acc1, acc5 = Training.validate(val_loader)
         
-        scheduler.step()
-        
         # remember best acc@1 and save checkpoint
         is_best = acc1 > best_acc1
         best_acc1 = max(acc1, best_acc1)
         best_acc5 = max(acc5, best_acc5)
 
         logger.log({"learning_rate": optimizer.param_groups[0]["lr"], "epoch": epoch, "top1.val": best_acc1, "top5.val": best_acc5})
+
+        scheduler.step()
 
         if not args.multiprocessing_distributed or (args.multiprocessing_distributed
                 and args.rank % ngpus_per_node == 0):
