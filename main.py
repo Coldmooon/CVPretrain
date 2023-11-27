@@ -100,7 +100,7 @@ def main_worker(gpu, ngpus_per_node, args):
     
     # define optimizer
     optimzers = Optimizers(args)
-    optimizer = optimzers.create(model, policy='regular')
+    optimizer = optimzers.create(model, policy='no_bias_norm_decay')
 
     # define learning rate scheduler
     scheduling = Scheduler(args, lr_policy='CosWarmup')
@@ -126,11 +126,6 @@ def main_worker(gpu, ngpus_per_node, args):
     logger.log({"learning_rate": optimizer.param_groups[0]["lr"]})
 
     is_best = None
-    checkpoints.save({
-                'state_dict': model.state_dict(),
-                'optimizer' : optimizer.state_dict(),
-                'scheduler' : scheduler.state_dict()
-            }, is_best)
     for epoch in range(args.start_epoch, args.epochs):
         if args.distributed and args.disable_dali:
             # train_sampler.set_epoch(epoch)
