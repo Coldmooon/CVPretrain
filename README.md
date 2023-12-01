@@ -1,12 +1,16 @@
 # CVPretrain
 
-CVPretrain is a project that optimizes the official PyTorch example on ImageNet. 
+This repo is based on the [pytorch official imagenet example](https://github.com/pytorch/examples/tree/main/imagenet), but with some optimizations, such as:
 
-## Requirements
-
-- PyTorch 2.0 or higher
-- torchvision 0.16 or higher
-- NVIDIA DALI 1.31 or higher
+# PyTorch ImageNet Example with Optimizations
+- Highly structured codes: This repo follows a modular and object-oriented design that makes the code easy to read, understand, and extend. The main components of the training pipeline are encapsulated in classes and functions that are well tested.
+- [NVIDIA DALI Dataloader](https://developer.nvidia.com/dali): A GPU-accelerated library for data loading and pre-processing to speed up deep learning applications. It can reduce the CPU workload and memory usage, and enable faster data transfer. 
+- [Mixed precision](https://pytorch.org/docs/stable/amp.html): A technique that uses both 16-bit and 32-bit floating-point types to reduce memory and improve performance. It can also leverage the Tensor Cores on modern GPUs for faster math operations.
+- [ResNet-D](https://openaccess.thecvf.com/content_CVPR_2019/html/He_Bag_of_Tricks_for_Image_Classification_with_Convolutional_Neural_Networks_CVPR_2019_paper.html): A modification on the ResNet architecture that uses an average pooling layer for downsampling instead of a strided convolution. This can improve the accuracy and robustness of the model.
+- [wandb log system](https://wandb.ai/site): A tool for tracking and visualizing metrics, media, and objects in experiments. It can help you compare different runs, share your results, and reproduce your work.
+- [No_bias_decay](https://openaccess.thecvf.com/content_CVPR_2019/html/He_Bag_of_Tricks_for_Image_Classification_with_Convolutional_Neural_Networks_CVPR_2019_paper.html): A regularization technique that applies weight decay only to the weights and not the biases or BatchNorm parameters. This can prevent overfitting and improve the generalization ability of the model.
+- More flexible checkpoints saving and loading: A feature that allows you to save and load not only the model's state_dict, but also the optimizer's state_dict, the epoch, the loss, and any other information you want. This can help you resume training from where you left off, or fine-tune your model on a new task.
+- Multiple learning schedule: The code supports additional learning rate policies for the optimizer, such as cosine warmup,and custom. You can specify the policy name and parameters in the `opts.py` file. The scheduler will adjust the learning rate according to the policy and the training progress. This feature allows you to experiment with different learning schedules and find the optimal one for your model.
 
 ## Training
 
