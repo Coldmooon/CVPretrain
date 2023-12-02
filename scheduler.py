@@ -8,11 +8,11 @@ class Scheduler:
         self.lr_policy = lr_policy
         self.args = args
 
-    def create(self, optimizer, start_factor, end_factor=1, total_iters=5):
+    def create(self, optimizer, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1):
         if self.lr_policy == "StepWarmup":
             return self.StepWarmup(optimizer, start_factor, end_factor, total_iters)
         if self.lr_policy == "CosWarmup":
-            return self.CosinWarmup(optimizer, start_factor, end_factor, total_iters)
+            return self.CosinWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma)
         else:
             raise ValueError("Unknow Learning Rate Policy...")
 
