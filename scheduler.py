@@ -1,22 +1,6 @@
 import math
 import torch
-from torch.optim.lr_scheduler import LinearLR
-from torch.optim.lr_scheduler import MultiStepLR
-from torch.optim.lr_scheduler import ChainedScheduler
 from torch.optim.lr_scheduler import LambdaLR
-
-
-# Define a custom class that inherits from LinearLR
-class WarmupLR(LinearLR):
-    # Override the constructor to accept an additional argument: end_factor
-    def __init__(self, optimizer, start_factor, end_factor=1.0, total_iters=5, last_epoch=-1, verbose=False):
-        # Pass the end_factor argument to the parent class constructor
-        super().__init__(optimizer, start_factor=start_factor, end_factor=end_factor, total_iters=total_iters, last_epoch=last_epoch, verbose=verbose)
-
-    # Override the _get_closed_form_lr method to use the end_factor
-    def _get_closed_form_lr(self):
-        return [base_lr * (self.start_factor + (self.end_factor - self.start_factor) * min(self.total_iters, self.last_epoch) / self.total_iters)
-                for base_lr in self.base_lrs]
 
 
 class Scheduler:
@@ -26,20 +10,19 @@ class Scheduler:
 
     def create(self, optimizer, start_factor, end_factor=1, total_iters=5):
         if self.lr_policy == "StepWarmup":
-            return self.StepWarmup(optimizer)
+            return self.StepWarmup(optimizer, start_factor, end_factor, total_iters)
         if self.lr_policy == "CosWarmup":
             return self.CosinWarmup(optimizer, start_factor, end_factor, total_iters)
         else:
             raise ValueError("Unknow Learning Rate Policy...")
 
 
-    def StepWarmup(self, optimizer):
-        # Create an instance of the warmup scheduler with the desired parameters
-        warmup_scheduler = WarmupLR(optimizer, start_factor=0.1/self.args.lr, total_iters=5, verbose=True)
-        # Create an instance of the step decay scheduler with the desired parameters
-        step_scheduler = MultiStepLR(optimizer, milestones=[60, 120, 150, 190], gamma=0.1, verbose=True)
-        # Create an instance of the chained scheduler that combines the two schedulers
-        scheduler = ChainedScheduler([warmup_scheduler, step_scheduler])
+    def StepWarmup(self, optimizer, start_factor, end_factor, total_iters, milestones, gamma):
+        # Define a lambda function that returns the learning rate factor
+        # based on the current epoch and the warmup and decay parameters
+        lambda_multi = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters) if epoch <= total_iters else gamma ** len([m for m in milestones if m <= epoch])
+        # Create a LambdaLR scheduler with the lambda function
+        scheduler = LambdaLR(optimizer, lr_lambda=lambda_multi)
 
         return scheduler
 
