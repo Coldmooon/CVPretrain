@@ -1,10 +1,10 @@
 import wandb
 
 class Wanlog:
-    def __init__(self, args, model, ngpus_per_node, project, notes, tags, config):
+    def __init__(self, args, model, project, notes, tags, config):
         self.args = args
         self.watch_gradients = False
-        self.run = self.setup(ngpus_per_node, project, notes, tags, config)
+        self.run = self.setup(project, notes, tags, config)
         self.watch(model)  # watch gradients only for rank 0
 
 
@@ -58,15 +58,15 @@ class Logger:
                         "compiled": self.args.compiled,
                         "mixed precision": 1, 
                       }
-        self.logger = self.setlogger(model, ngpus_per_node, args.logsys)
+        self.logger = self.setlogger(model, args.logsys)
 
 
-    def setlogger(self, model, ngpus_per_node, logsystem):
-        if (logsystem is None):
+    def setlogger(self, model, logsystem):
+        if (logsystem is None or self.args.rank != 0):
             print("No log system used...")
         elif (logsystem == 'wandb'):
             print("Using wandb log.")
-            return Wanlog(self.args, model, ngpus_per_node, self.project, self.notes, self.tags, self.config)
+            return Wanlog(self.args, model, self.project, self.notes, self.tags, self.config)
 
         return None
     
