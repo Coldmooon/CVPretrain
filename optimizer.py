@@ -71,8 +71,9 @@ class Optimizers():
                 elif pn.endswith('alpha') or pn.endswith('beta'):
                     # Parameters ending in 'alpha' or 'beta' will not be decayed
                     no_decay.add(fpn)
-                elif pn.endswith('in_proj_weight') or pn.endswith('pos_embedding') or pn.endswith('class_token'):
-                    # Parameters ending in 'alpha' or 'beta' will not be decayed
+                elif pn.endswith('in_proj_weight'):
+                    decay.add(fpn)
+                elif pn.endswith('pos_embedding') or pn.endswith('class_token'):
                     no_decay.add(fpn)
                     
         # special case the position embedding parameter in the root GPT module as not decayed
