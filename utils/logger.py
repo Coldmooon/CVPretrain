@@ -48,9 +48,10 @@ class Logger:
         self.config = {
                         "architecture": self.args.arch,
                         "learning_rate": self.args.lr,
+                        "weight_decay": self.weight_decay,
+                        "batch_size": self.args.batch_size * ngpus_per_node,
                         "label_smoothing": self.args.label_smoothing,
                         "epochs": self.args.epochs,
-                        "batch_size": self.args.batch_size * ngpus_per_node,
                         "dataset": "imagenet",
                         "num_workers": self.args.workers * ngpus_per_node,
                         "num_gpus": self.args.world_size,
