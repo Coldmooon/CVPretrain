@@ -48,7 +48,7 @@ class Logger:
         self.config = {
                         "architecture": self.args.arch,
                         "learning_rate": self.args.lr,
-                        "weight_decay": self.weight_decay,
+                        "weight_decay": self.args.weight_decay,
                         "batch_size": self.args.batch_size * ngpus_per_node,
                         "label_smoothing": self.args.label_smoothing,
                         "epochs": self.args.epochs,
