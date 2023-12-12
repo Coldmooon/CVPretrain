@@ -107,7 +107,8 @@ def main_worker(gpu, ngpus_per_node, args):
     scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
 
     # define dataloader
-    train_loader, val_loader = Dataloader.dataloader(args)
+    dataloader = Dataloader.Dataloader(args, dataloader_type='dali')
+    train_loader, val_loader = dataloader.create()
 
     # construct Trainer
     Training = Trainer(model, optimizer, criterion, scheduler, args)
