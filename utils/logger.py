@@ -84,4 +84,4 @@ class Logger:
     
     def finish(self):
         if self.logger is not None:
-            self.run.finish()
+            self.logger.finish()
