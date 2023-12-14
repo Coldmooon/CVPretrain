@@ -72,7 +72,7 @@ class ArgumentParser:
                             help="Comma-separated 'key:value' pairs, e.g. 'project_name:MyProject,notes:Some notes'")
         self.parser.add_argument('--logsys', metavar='LOG_SYSTEM', type=str,
                             help="Select log system, e.g., wandb or None")        
-        self.parser.add_argument('--log-id', metavar='LOG_ID', type=str, 
+        self.parser.add_argument('--log-id', metavar='LOG_ID', type=str, dest='logid', 
                             help="A Wandb Run ID, e.g., sozupknt ")
 
     def parse_args(self):
