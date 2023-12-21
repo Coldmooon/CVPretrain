@@ -7,15 +7,23 @@ class Optimizers():
         self.args = args
 
 
-    def create(self, model, policy='no_bias_norm_decay'):
+    def create(self, model, optim='sgd', policy='no_bias_norm_decay'):
         if policy == 'regular':
-            return torch.optim.SGD(model.parameters(), self.args.lr,
-                                   momentum=self.args.momentum,
-                                   weight_decay=self.args.weight_decay)
+            params = model.parameters()
+            global_weight_decay = self.args.weight_decay
         elif policy == 'no_bias_norm_decay':
             params = self.no_bias_norm_decay(model)
-            return torch.optim.SGD(params, self.args.lr, momentum=self.args.momentum)
+            global_weight_decay = 0
 
+        if optim == 'sgd':
+            return torch.optim.SGD(params, self.args.lr,
+                                   momentum=self.args.momentum,
+                                   weight_decay=global_weight_decay)
+        elif optim == 'adam':
+            return torch.optim.SGD(params, self.args.lr, 
+                                   betas=(0.9, 0.999), eps=1e-08, 
+                                   weight_decay=global_weight_decay)
+        
 
     def no_bias_norm_decay_simple(self, model):
         # Separate parameters into groups
