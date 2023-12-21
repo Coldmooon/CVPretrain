@@ -20,34 +20,10 @@ class Optimizers():
                                    momentum=self.args.momentum,
                                    weight_decay=global_weight_decay)
         elif optim == 'adam':
-            return torch.optim.SGD(params, self.args.lr, 
+            return torch.optim.Adam(params, self.args.lr, 
                                    betas=(0.9, 0.999), eps=1e-08, 
                                    weight_decay=global_weight_decay)
         
-
-    def no_bias_norm_decay_simple(self, model):
-        # Separate parameters into groups
-        weight_params = []
-        bias_params = []
-        bn_params = []
-
-        for name, param in model.named_parameters():
-            if 'weight' in name and ('conv' in name or 'fc' in name):
-                weight_params.append(param)
-            elif 'bias' in name:
-                bias_params.append(param)
-            elif 'bn' in name:
-                bn_params.append(param)
-
-        # No Bias/BN Decay: define separate parameter groups with specific regularization
-        params = [
-            {'params': weight_params, 'weight_decay': self.args.weight_decay},  # Apply weight decay to weights of conv and fc layers
-            {'params': bias_params, 'weight_decay': 0},              # No weight decay for biases
-            {'params': bn_params, 'weight_decay': 0},                # No weight decay for batch norm parameters
-        ]
-
-        return params
-
 
     # modified from https://github.com/karpathy/minGPT/blob/3ed14b2cec0dfdad3f4b2831f2b4a86d11aef150/mingpt/model.py#L136
     def no_bias_norm_decay(self, model):
