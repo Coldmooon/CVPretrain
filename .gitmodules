@@ -1,0 +1,3 @@
+[submodule "models/external/vit-pytorch"]
+	path = models/external/vit-pytorch
+	url = https://github.com/lucidrains/vit-pytorch.git
