@@ -109,7 +109,8 @@ class Trainer:
         print("torch.backends.cudnn.allow_tf32: ", torch.backends.cudnn.allow_tf32)
         print("torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction", torch.backends.cuda.matmul.allow_bf16_reduced_precision_reduction)
         print("--------------------------------------------------------------------")
-        self.scaler = amp.GradScaler() 
+        self.scaler = amp.GradScaler()
+        self.gradient_clip = args.gradient_clip
 
     def train(self, train_loader, epoch, logger):
 
@@ -157,13 +158,19 @@ class Trainer:
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
 
-            # compute gradient and do SGD step
             self.optimizer.zero_grad()
-            # loss.backward()
-            # self.optimizer.step()
-            
+
             # Use GradScaler to unscale and update the gradients
             self.scaler.scale(loss).backward()
+            
+            # Gradient Clip
+            if self.gradient_clip > 1e-3:
+                # https://pytorch.org/docs/stable/notes/amp_examples.html#gradient-clipping
+                # Unscales the gradients of optimizer's assigned params in-place
+                self.scaler.unscale_(self.optimizer)
+                # Since the gradients of optimizer's assigned params are unscaled, clips as usual:
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+
             self.scaler.step(self.optimizer)
             self.scaler.update()
 
