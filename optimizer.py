@@ -37,6 +37,9 @@ class Optimizers():
         # separate out all parameters to those that will and won't experience regularizing weight decay
         decay = set()
         no_decay = set()
+        # Note: Different implements of transformer block usually have different name style. So, for Vit 
+        # or other transformer models, you should print(pn) to check which layer.weights or bias should be
+        # decay.
         whitelist_weight_modules = (torch.nn.Conv2d, torch.nn.Linear)
         blacklist_weight_modules = (torch.nn.BatchNorm2d, torch.nn.LayerNorm, torch.nn.Embedding)
         for mn, m in model.named_modules():
@@ -57,7 +60,8 @@ class Optimizers():
                     no_decay.add(fpn)
                 elif pn.endswith('in_proj_weight'):
                     decay.add(fpn)
-                elif pn.endswith('pos_embedding') or pn.endswith('class_token'):
+                # for Transformer block:
+                elif pn.endswith('pos_embedding') or pn.endswith('token'):
                     no_decay.add(fpn)
                     
         # special case the position embedding parameter in the root GPT module as not decayed
