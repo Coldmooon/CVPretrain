@@ -51,7 +51,7 @@ class Attention(nn.Module):
         x = self.norm(x)
 
         qkv = self.to_qkv(x).chunk(3, dim=-1)
-        q, k, v = [t.reshape(x.shape[0], -1, self.heads, self.dim_head).permute(0, 2, 1, 3) for t in qkv]
+        q, k, v = (t.view(x.shape[0], x.shape[1], self.heads, -1).transpose(1, 2) for t in qkv)
 
         dots = torch.matmul(q, k.transpose(-1, -2)) * self.scale
 
@@ -59,7 +59,7 @@ class Attention(nn.Module):
         attn = self.dropout(attn)
 
         out = torch.matmul(attn, v)
-        out = out.permute(0, 2, 1, 3).reshape(x.shape[0], -1, self.heads * self.dim_head)
+        out = out.transpose(1, 2).contiguous().view(x.shape[0], -1, self.heads * (k.shape[-1]))
         return self.to_out(out)
 
 class Transformer(nn.Module):
