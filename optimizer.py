@@ -13,17 +13,24 @@ class Optimizers():
             global_weight_decay = self.args.weight_decay
         elif policy == 'no_bias_norm_decay':
             params = self.no_bias_norm_decay(model)
-            global_weight_decay = 0
+            global_weight_decay = 0 # optim_groups will take precedence over the global weight_decay setting
 
         if optim == 'sgd':
-            return torch.optim.SGD(params, self.args.lr,
+            optimizer = torch.optim.SGD(params, 
+                                   self.args.lr,
                                    momentum=self.args.momentum,
                                    weight_decay=global_weight_decay)
         elif optim == 'adam':
-            return torch.optim.Adam(params, self.args.lr, 
-                                   betas=(0.9, 0.999), eps=1e-08, 
-                                   weight_decay=global_weight_decay)
+            optimizer = torch.optim.Adam(params, 
+                                    self.args.lr, 
+                                    betas=(0.9, 0.999), 
+                                    eps=1e-08, 
+                                    weight_decay=global_weight_decay)
         
+        for i, group in enumerate(optimizer.param_groups):
+            print(f"Parameter group {i} weight_decay: {group['weight_decay']}")
+        
+        return optimizer
 
     # modified from https://github.com/karpathy/minGPT/blob/3ed14b2cec0dfdad3f4b2831f2b4a86d11aef150/mingpt/model.py#L136
     def no_bias_norm_decay(self, model):
@@ -40,8 +47,16 @@ class Optimizers():
         # Note: Different implements of transformer block usually have different name style. So, for Vit 
         # or other transformer models, you should print(pn) to check which layer.weights or bias should be
         # decay.
-        whitelist_weight_modules = (torch.nn.Conv2d, torch.nn.Linear)
-        blacklist_weight_modules = (torch.nn.BatchNorm2d, torch.nn.LayerNorm, torch.nn.Embedding)
+        whitelist_weight_modules = (torch.nn.Conv2d, 
+                                    torch.nn.Linear)
+        
+        blacklist_weight_modules = (torch.nn.BatchNorm2d, 
+                                    torch.nn.LayerNorm,  
+                                    torch.nn.GroupNorm,
+                                    torch.nn.modules.instancenorm,
+                                    torch.nn.LocalResponseNorm,
+                                    torch.nn.Embedding)
+        
         for mn, m in model.named_modules():
             for pn, p in m.named_parameters():
                 fpn = '%s.%s' % (mn, pn) if mn else pn # full param name
@@ -61,7 +76,7 @@ class Optimizers():
                 elif pn.endswith('in_proj_weight'):
                     decay.add(fpn)
                 # for Transformer block:
-                elif pn.endswith('pos_embedding') or pn.endswith('token'):
+                elif pn.endswith('pos_embedding') or pn.endswith('token') or pn.endswith('relative_position_bias_table'):
                     no_decay.add(fpn)
                     
         # special case the position embedding parameter in the root GPT module as not decayed
