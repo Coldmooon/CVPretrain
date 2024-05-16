@@ -1,20 +1,38 @@
 import math
 import torch
-from torch.optim.lr_scheduler import LambdaLR
-
+from torch.optim.lr_scheduler import LambdaLR,StepLR,CosineAnnealingLR,ExponentialLR
 
 class Scheduler:
     def __init__(self, args, lr_policy='CosWarmup'):
         self.lr_policy = lr_policy
         self.args = args
 
-    def create(self, optimizer, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1):
-        if self.lr_policy == "StepWarmup":
-            return self.StepWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma)
-        if self.lr_policy == "CosWarmup":
-            return self.CosinWarmup(optimizer, start_factor, end_factor, total_iters)
-        else:
-            raise ValueError("Unknow Learning Rate Policy...")
+    def create(self, optimizer, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1, eta_min=0):
+        if not isinstance(optimizer, torch.optim.Optimizer):
+            raise ValueError("optimizer must be an instance of torch.optim.Optimizer")
+        if total_iters < 0:
+            raise ValueError("total_iters must be a non-negative integer")
+        # ---------------------------------------------------------------------
+
+        schedulers = {
+            "steplr": lambda: StepLR(optimizer, step_size=milestones[0], gamma=gamma),
+            "cosineannealinglr": lambda: CosineAnnealingLR(
+                optimizer, T_max=self.args.epochs - total_iters, eta_min=eta_min
+            ),
+            "exponentiallr": lambda: ExponentialLR(optimizer, gamma=gamma),
+            "StepWarmup": lambda: self.StepWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma),
+            "CosWarmup": lambda: self.CosinWarmup(optimizer, start_factor, end_factor, total_iters),
+        }
+
+        try:
+            scheduler = schedulers[self.lr_policy]
+            return scheduler()
+        except KeyError:
+            raise RuntimeError(
+                f"Invalid lr scheduler '{self.lr_policy}'. Only StepWarmup, CosWarmup, StepLR, CosineAnnealingLR and ExponentialLR "
+                "are supported."
+            )
+
 
 
     def StepWarmup(self, optimizer, start_factor, end_factor, total_iters, milestones, gamma):
