@@ -26,7 +26,11 @@ class Optimizers():
                                     betas=(0.9, 0.999), 
                                     eps=1e-08, 
                                     weight_decay=global_weight_decay)
-        
+        elif optim == 'adamw':
+            optimizer = torch.optim.AdamW(params, 
+                                          self.args.lr,
+                                          weight_decay=global_weight_decay)
+
         for i, group in enumerate(optimizer.param_groups):
             print(f"Parameter group {i} weight_decay: {group['weight_decay']}")
         
@@ -47,13 +51,13 @@ class Optimizers():
         # Note: Different implements of transformer block usually have different name style. So, for Vit 
         # or other transformer models, you should print(pn) to check which layer.weights or bias should be
         # decay.
-        whitelist_weight_modules = (torch.nn.Conv2d, 
+        whitelist_weight_modules = (torch.nn.Conv2d,
                                     torch.nn.Linear)
         
-        blacklist_weight_modules = (torch.nn.BatchNorm2d, 
-                                    torch.nn.LayerNorm,  
+        blacklist_weight_modules = (torch.nn.BatchNorm2d,
+                                    torch.nn.LayerNorm,
                                     torch.nn.GroupNorm,
-                                    torch.nn.modules.instancenorm,
+                                    torch.nn.InstanceNorm2d,
                                     torch.nn.LocalResponseNorm,
                                     torch.nn.Embedding)
         
