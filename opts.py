@@ -18,6 +18,8 @@ class ArgumentParser:
                             help='model architecture: ' +
                                 ' | '.join(model_names) +
                                 ' (default: resnet18)')
+        self.parser.add_argument('--optim', default='sgd', type=str, 
+                            help='optimizer (default: sgd)')
         self.parser.add_argument('-j', '--workers', default=4, type=int, metavar='N',
                             help='number of data loading workers (default: 4)')
         self.parser.add_argument('--epochs', default=90, type=int, metavar='N',
@@ -64,18 +66,23 @@ class ArgumentParser:
         self.parser.add_argument('--dummy', action='store_true', help="use fake data to benchmark")
         self.parser.add_argument('--compiled', default=0, type=int,
                             help='If use torch.compile, default is 0.')
-        self.parser.add_argument('--disable-dali', default=False, action='store_true', dest='disable_dali',
-                            help='Disable DALI data loader and use native PyTorch one instead.')
+        self.parser.add_argument('--dataloader', default='pytorch', type=str,
+                            help='Choose NVIDIA dali dataloader and use native PyTorch dataloader instead.')
         self.parser.add_argument('--ls', '--label-smoothing', default=0.0, type=float, dest='label_smoothing',
                             help='label smoothing')
         self.parser.add_argument('--gradclip', '--gradient-clip', default=0.0, type=float, dest='gradient_clip',
                             help='gradient clip')
+        
+        # Training Log system
         self.parser.add_argument('--notes', metavar='DESCRIPTION', type=lambda s: {k:v for k,v in (i.split(':') for i in s.split(','))}, 
                             help="Comma-separated 'key:value' pairs, e.g. 'project_name:MyProject,notes:Some notes'")
         self.parser.add_argument('--logsys', metavar='LOG_SYSTEM', type=str,
                             help="Select log system, e.g., wandb or None")        
         self.parser.add_argument('--log-id', metavar='LOG_ID', type=str, dest='logid', 
                             help="A Wandb Run ID, e.g., sozupknt ")
+        
+        # Mixed precision training parameters
+        self.parser.add_argument("--amp", action="store_true", help="Use torch.cuda.amp for mixed precision training")
 
     def parse_args(self):
         return self.parser.parse_args()
