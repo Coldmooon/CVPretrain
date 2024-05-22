@@ -15,6 +15,7 @@ class Optimizers():
             params = self.no_bias_norm_decay(model)
             global_weight_decay = 0 # optim_groups will take precedence over the global weight_decay setting
 
+
         if optim == 'sgd':
             optimizer = torch.optim.SGD(params, 
                                    self.args.lr,
@@ -30,6 +31,9 @@ class Optimizers():
             optimizer = torch.optim.AdamW(params, 
                                           self.args.lr,
                                           weight_decay=global_weight_decay)
+        else:
+            raise ValueError('optimizer not supported: {}'.format(optim))
+
 
         for i, group in enumerate(optimizer.param_groups):
             print(f"Parameter group {i} weight_decay: {group['weight_decay']}")
@@ -87,6 +91,7 @@ class Optimizers():
         # no_decay.add('pos_emb')
 
         # validate that we considered every parameter
+        # param_dict is constructed by {parameter_name: parameter}
         param_dict = {pn: p for pn, p in model.named_parameters()}
         inter_params = decay & no_decay
         union_params = decay | no_decay
@@ -95,9 +100,17 @@ class Optimizers():
                                                     % (str(param_dict.keys() - union_params), )
 
         # create the pytorch optimizer object
-        optim_groups = [
-            {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": self.args.weight_decay},
-            {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
-        ]
+        gradient_check = False
+        if not gradient_check:
+            optim_groups = [
+                {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": self.args.weight_decay},
+                {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
+            ]
+        else:
+            optim_groups = []
+            for pn in sorted(list(decay)):
+                optim_groups.append({"params": param_dict[pn], "weight_decay": self.args.weight_decay, "layer_name": pn})
+            for pn in sorted(list(no_decay)):
+                optim_groups.append({"params": param_dict[pn], "weight_decay": 0.0, "layer_name": pn})
 
         return optim_groups
