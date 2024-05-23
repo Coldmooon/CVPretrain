@@ -111,6 +111,7 @@ class Trainer:
         print("--------------------------------------------------------------------")
         self.scaler = amp.GradScaler()
         self.gradient_clip = args.gradient_clip
+        self.dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
 
     def train(self, train_loader, epoch, logger):
 
@@ -135,7 +136,7 @@ class Trainer:
             # Measure data loading time
             data_time.update(time.time() - end)
 
-            if self.args.disable_dali:
+            if self.args.dataloader == 'pytorch':
                 images, target = data
                 # move data to the same device as model
                 images = images.to(self.args.gpu, non_blocking=True)
@@ -148,17 +149,20 @@ class Trainer:
 
             # compute output
             # Wrap the model and optimizer in autocast context manager
-            with amp.autocast():
+            with amp.autocast(enabled=self.args.amp, dtype=self.dtype):
                 output = self.model(images)
+                # output is float16 because linear layers autocast to float16.
+                assert output.dtype is self.dtype
+
                 loss = self.criterion(output, target)
+                # loss layers autocast to float32.
+                assert loss.dtype is torch.float32
 
             # Measure the accuracy and record the loss
             acc1, acc5 = self.accuracy(output, target, topk=(1, 5))
             losses.update(loss.item(), images.size(0))
             top1.update(acc1[0], images.size(0))
             top5.update(acc5[0], images.size(0))
-
-            self.optimizer.zero_grad()
 
             # Use GradScaler to unscale and update the gradients
             self.scaler.scale(loss).backward()
@@ -169,10 +173,12 @@ class Trainer:
                 # Unscales the gradients of optimizer's assigned params in-place
                 self.scaler.unscale_(self.optimizer)
                 # Since the gradients of optimizer's assigned params are unscaled, clips as usual:
-                torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.gradient_clip)
+                torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=self.gradient_clip)   
 
             self.scaler.step(self.optimizer)
             self.scaler.update()
+
+            self.optimizer.zero_grad()
 
             # measure elapsed time
             batch_time.update(time.time() - end)
@@ -189,7 +195,7 @@ class Trainer:
 
         self.model.eval()
 
-        if self.args.disable_dali:
+        if self.args.dataloader == 'pytorch':
             if self.args.distributed:
                 val_loader_len = len(val_loader.sampler) 
             else:
@@ -213,10 +219,10 @@ class Trainer:
             top1.all_reduce()
             top5.all_reduce()
 
-        if not self.args.disable_dali:
+        if self.args.dataloader == 'dali':
             # # TO DO: for DALI: ensure that in distributed training mode, each process can evaluate the entire validation set, instead of only a part of the data.
             pass 
-        else:
+        elif self.args.dataloader == 'pytorch':
             # Distributed PyTorch validation
             if self.args.distributed and (len(val_loader.sampler) * self.args.world_size < len(val_loader.dataset)):
                 aux_val_dataset = Subset(val_loader.dataset,
@@ -225,6 +231,8 @@ class Trainer:
                     aux_val_dataset, batch_size=self.args.batch_size, shuffle=False,
                     num_workers=self.args.workers, pin_memory=True)
                 self.run_validate(aux_val_loader, batch_time, losses, top1, top5, progress, len(val_loader))
+        else:
+            raise NotImplementedError
 
         progress.display_summary()
         
@@ -238,7 +246,7 @@ class Trainer:
             end = time.time()
 
             for i, data in enumerate(val_loader):
-                if self.args.disable_dali:
+                if self.args.dataloader == 'pytorch':
                     images, target = data
                 else:
                     images = data[0]["data"]
@@ -246,14 +254,14 @@ class Trainer:
                     
                 i = base_progress + i
                 if self.args.gpu is not None and torch.cuda.is_available():
-                    # images = images.cuda(args.gpu, non_blocking=True)
-                    pass # just pass for DALI
+                    images = images.cuda(self.args.gpu, non_blocking=True)
+                    # pass # just pass for DALI
                 if torch.backends.mps.is_available():
                     images = images.to('mps')
                     target = target.to('mps')
                 if torch.cuda.is_available():
-                    # target = target.cuda(args.gpu, non_blocking=True)
-                    pass # just pass for DALI
+                    target = target.cuda(self.args.gpu, non_blocking=True)
+                    # pass # just pass for DALI
 
 
                 # compute output
