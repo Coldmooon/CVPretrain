@@ -7,29 +7,30 @@ class Optimizers():
         self.args = args
 
 
-    def create(self, model, optim='sgd', policy='no_bias_norm_decay'):
+    @classmethod
+    def create(cls, model, optim='sgd', lr=0.1, weight_decay=0.0, policy='no_bias_norm_decay', momentum=0.9):
         if policy == 'regular':
             params = model.parameters()
-            global_weight_decay = self.args.weight_decay
+            global_weight_decay = weight_decay
         elif policy == 'no_bias_norm_decay':
-            params = self.no_bias_norm_decay(model)
+            params = cls.no_bias_norm_decay(model, weight_decay)
             global_weight_decay = 0 # optim_groups will take precedence over the global weight_decay setting
 
 
         if optim == 'sgd':
             optimizer = torch.optim.SGD(params, 
-                                   self.args.lr,
-                                   momentum=self.args.momentum,
+                                   lr,
+                                   momentum=momentum,
                                    weight_decay=global_weight_decay)
         elif optim == 'adam':
             optimizer = torch.optim.Adam(params, 
-                                    self.args.lr, 
+                                    lr, 
                                     betas=(0.9, 0.999), 
                                     eps=1e-08, 
                                     weight_decay=global_weight_decay)
         elif optim == 'adamw':
             optimizer = torch.optim.AdamW(params, 
-                                          self.args.lr,
+                                          lr,
                                           weight_decay=global_weight_decay)
         else:
             raise ValueError('optimizer not supported: {}'.format(optim))
@@ -40,8 +41,10 @@ class Optimizers():
         
         return optimizer
 
+
     # modified from https://github.com/karpathy/minGPT/blob/3ed14b2cec0dfdad3f4b2831f2b4a86d11aef150/mingpt/model.py#L136
-    def no_bias_norm_decay(self, model):
+    @classmethod
+    def no_bias_norm_decay(cls, model, weight_decay=0.0):
         """
         This long function is unfortunately doing something very simple and is being very defensive:
         We are separating out all parameters of the model into two buckets: those that will experience
@@ -103,13 +106,13 @@ class Optimizers():
         gradient_check = False
         if not gradient_check:
             optim_groups = [
-                {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": self.args.weight_decay},
+                {"params": [param_dict[pn] for pn in sorted(list(decay))], "weight_decay": weight_decay},
                 {"params": [param_dict[pn] for pn in sorted(list(no_decay))], "weight_decay": 0.0},
             ]
         else:
             optim_groups = []
             for pn in sorted(list(decay)):
-                optim_groups.append({"params": param_dict[pn], "weight_decay": self.args.weight_decay, "layer_name": pn})
+                optim_groups.append({"params": param_dict[pn], "weight_decay": weight_decay, "layer_name": pn})
             for pn in sorted(list(no_decay)):
                 optim_groups.append({"params": param_dict[pn], "weight_decay": 0.0, "layer_name": pn})
 

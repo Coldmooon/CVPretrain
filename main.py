@@ -101,8 +101,7 @@ def main_worker(gpu, ngpus_per_node, args):
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
     
     # define optimizer
-    optimzers = Optimizers(args)
-    optimizer = optimzers.create(model, args.optim, policy='no_bias_norm_decay')
+    optimizer = Optimizers.create(model, args.optim, args.lr, args.weight_decay, policy='no_bias_norm_decay')
 
     # define learning rate scheduler
     scheduling = Scheduler(args, lr_policy='CosWarmup')
