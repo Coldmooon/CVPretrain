@@ -7,7 +7,7 @@ class Scheduler:
         self.lr_policy = lr_policy
         self.args = args
 
-
+    @classmethod
     def create(cls, optimizer, epochs, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1, eta_min=0, lr_policy='CosWarmup'):
         if not isinstance(optimizer, torch.optim.Optimizer):
             raise ValueError("optimizer must be an instance of torch.optim.Optimizer")
@@ -22,7 +22,7 @@ class Scheduler:
             ),
             "exponentiallr": lambda: ExponentialLR(optimizer, gamma=gamma),
             "StepWarmup": lambda: cls.StepWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma),
-            "CosWarmup": lambda: cls.CosinWarmup(optimizer, start_factor, end_factor, total_iters),
+            "CosWarmup": lambda: cls.CosinWarmup(optimizer, epochs, start_factor, end_factor, total_iters),
         }
 
         try:
