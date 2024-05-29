@@ -13,7 +13,7 @@ import torch.utils.data
 import torch.utils.data.distributed
 
 from opts import ArgumentParser
-from datasets import dataloader as Dataloader
+from datasets.dataloader import Dataloader
 from optimizer import Optimizers
 from train import Trainer
 from checkpoints import Checkpoints
@@ -88,14 +88,13 @@ def main_worker(gpu, ngpus_per_node, args):
         dist.init_process_group(backend=args.dist_backend, init_method=args.dist_url,
                                 world_size=args.world_size, rank=args.rank)
 
-    # create modle
-    modeling = Model(args)
-    model = modeling.create(ngpus_per_node)
-
     if args.gpu:
         device = torch.device('cuda:{}'.format(args.gpu))
     else:
         device = torch.device("cuda")
+
+    # create modle
+    model = Model.create(args, ngpus_per_node)
 
     # define loss function (criterion)
     criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).to(device)
@@ -104,12 +103,10 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = Optimizers.create(model, args.optim, args.lr, args.weight_decay, policy='no_bias_norm_decay')
 
     # define learning rate scheduler
-    scheduling = Scheduler(args, lr_policy='CosWarmup')
-    scheduler = scheduling.create(optimizer, start_factor=args.startup_lr/args.lr, total_iters=args.warmup_epochs)
-
+    scheduler = Scheduler.create(optimizer, args.epochs, start_factor=args.startup_lr/args.lr, total_iters=args.warmup_epochs, lr_policy='CosWarmup')
+    
     # define dataloader
-    dataloader = Dataloader.Dataloader(args, dataloader_type=args.dataloader)
-    train_loader, val_loader = dataloader.create()
+    train_loader, val_loader = Dataloader.create(args, dataloader_type=args.dataloader)
 
     # construct Trainer
     Training = Trainer(model, optimizer, criterion, scheduler, args)

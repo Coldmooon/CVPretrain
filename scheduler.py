@@ -7,7 +7,8 @@ class Scheduler:
         self.lr_policy = lr_policy
         self.args = args
 
-    def create(self, optimizer, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1, eta_min=0):
+
+    def create(cls, optimizer, epochs, start_factor, end_factor=1, total_iters=5, milestones=[30, 60, 90], gamma=0.1, eta_min=0, lr_policy='CosWarmup'):
         if not isinstance(optimizer, torch.optim.Optimizer):
             raise ValueError("optimizer must be an instance of torch.optim.Optimizer")
         if total_iters < 0:
@@ -17,25 +18,25 @@ class Scheduler:
         schedulers = {
             "steplr": lambda: StepLR(optimizer, step_size=milestones[0], gamma=gamma),
             "cosineannealinglr": lambda: CosineAnnealingLR(
-                optimizer, T_max=self.args.epochs - total_iters, eta_min=eta_min
+                optimizer, T_max=epochs - total_iters, eta_min=eta_min
             ),
             "exponentiallr": lambda: ExponentialLR(optimizer, gamma=gamma),
-            "StepWarmup": lambda: self.StepWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma),
-            "CosWarmup": lambda: self.CosinWarmup(optimizer, start_factor, end_factor, total_iters),
+            "StepWarmup": lambda: cls.StepWarmup(optimizer, start_factor, end_factor, total_iters, milestones, gamma),
+            "CosWarmup": lambda: cls.CosinWarmup(optimizer, start_factor, end_factor, total_iters),
         }
 
         try:
-            scheduler = schedulers[self.lr_policy]
+            scheduler = schedulers[lr_policy]
             return scheduler()
         except KeyError:
             raise RuntimeError(
-                f"Invalid lr scheduler '{self.lr_policy}'. Only StepWarmup, CosWarmup, StepLR, CosineAnnealingLR and ExponentialLR "
+                f"Invalid lr scheduler '{lr_policy}'. Only StepWarmup, CosWarmup, StepLR, CosineAnnealingLR and ExponentialLR "
                 "are supported."
             )
 
 
-
-    def StepWarmup(self, optimizer, start_factor, end_factor, total_iters, milestones, gamma):
+    @classmethod
+    def StepWarmup(cls, optimizer, start_factor, end_factor, total_iters, milestones, gamma):
         # Define a lambda function that returns the learning rate factor
         # based on the current epoch and the warmup and decay parameters
         lambda_multi = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters) if epoch <= total_iters else gamma ** len([m for m in milestones if m <= epoch])
@@ -45,8 +46,9 @@ class Scheduler:
         return scheduler
 
 
-    def CosinWarmup(self, optimizer, start_factor, end_factor, total_iters):
-        lambda_cos = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters)  if epoch <= total_iters else 0.5 * (1 + math.cos(math.pi * (epoch - total_iters) / (self.args.epochs - total_iters)))
+    @classmethod
+    def CosinWarmup(cls, optimizer, epochs, start_factor, end_factor, total_iters):
+        lambda_cos = lambda epoch: (start_factor + (end_factor - start_factor) * epoch / total_iters)  if epoch <= total_iters else 0.5 * (1 + math.cos(math.pi * (epoch - total_iters) / (epochs - total_iters)))
         scheduler = LambdaLR(optimizer, lr_lambda=lambda_cos)
 
         return scheduler

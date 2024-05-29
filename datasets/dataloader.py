@@ -83,14 +83,16 @@ class Dataloader():
         self.args = args
         self.type = dataloader_type
         
-
-    def create(self):
-        if (self.type == 'dali'):
-            return self.dali_loader()
-        elif (self.type == 'pytorch'):
-            return self.pytorch_loader()
-        elif (self.type == 'dummy'):
-            return self.dummy_loader()
+    
+    @classmethod
+    def create(cls, args, dataloader_type):
+        set_dataloader = cls(args, dataloader_type)
+        if (dataloader_type == 'dali'):
+            return set_dataloader.dali_loader()
+        elif (dataloader_type == 'pytorch'):
+            return set_dataloader.pytorch_loader()
+        elif (dataloader_type == 'dummy'):
+            return set_dataloader.dummy_loader()
         else:
             raise TypeError("Unknown Dataloader Type...")
 

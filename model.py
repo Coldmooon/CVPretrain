@@ -7,8 +7,10 @@ class Model:
         self.args = args
 
 
-    def create(self, ngpus_per_node):
-        model = self.setup(ngpus_per_node)
+    @classmethod
+    def create(cls, args, ngpus_per_node):
+        setup_model = cls(args)
+        model = setup_model.setup(ngpus_per_node)
         return model
 
 
