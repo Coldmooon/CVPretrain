@@ -24,6 +24,8 @@ from utils import logger as Log
 best_acc1 = 0
 best_acc5 = 0
 
+os.environ["WANDB__SERVICE_WAIT"] = "300"
+
 def main():
     arg_parser = ArgumentParser()
     args = arg_parser.parse_args()
@@ -100,14 +102,14 @@ def main_worker(gpu, ngpus_per_node, args):
     
     # define optimizer
     optimzers = Optimizers(args)
-    optimizer = optimzers.create(model, policy='no_bias_norm_decay')
+    optimizer = optimzers.create(model, args.optim, policy='no_bias_norm_decay')
 
     # define learning rate scheduler
     scheduling = Scheduler(args, lr_policy='CosWarmup')
-    scheduler = scheduling.create(optimizer, start_factor=0.1/args.lr, total_iters=5)
+    scheduler = scheduling.create(optimizer, start_factor=args.startup_lr/args.lr, total_iters=args.warmup_epochs)
 
     # define dataloader
-    dataloader = Dataloader.Dataloader(args, dataloader_type='dali')
+    dataloader = Dataloader.Dataloader(args, dataloader_type=args.dataloader)
     train_loader, val_loader = dataloader.create()
 
     # construct Trainer
@@ -126,7 +128,7 @@ def main_worker(gpu, ngpus_per_node, args):
 
     is_best = None
     for epoch in range(args.start_epoch, args.epochs):
-        if args.distributed and args.disable_dali:
+        if args.distributed and args.dataloader=="pytorch":
             # train_sampler.set_epoch(epoch)
             train_loader.sampler.set_epoch(epoch)
 
