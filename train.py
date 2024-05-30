@@ -151,12 +151,13 @@ class Trainer:
             # Wrap the model and optimizer in autocast context manager
             with amp.autocast(enabled=self.args.amp, dtype=self.dtype):
                 output = self.model(images)
+                # print(f"Expected dtype: {self.dtype}, Actual dtype: {output.dtype}")  # Debug print
                 # output is float16 because linear layers autocast to float16.
-                assert output.dtype is self.dtype
+                assert output.dtype == self.dtype
 
                 loss = self.criterion(output, target)
                 # loss layers autocast to float32.
-                assert loss.dtype is torch.float32
+                assert loss.dtype == torch.float32
 
             # Measure the accuracy and record the loss
             acc1, acc5 = self.accuracy(output, target, topk=(1, 5))
