@@ -2,7 +2,7 @@ import torch
 import torch.optim
 
 
-class Optimizers():
+class Optimizers:
     def __init__(self, args):
         self.args = args
 

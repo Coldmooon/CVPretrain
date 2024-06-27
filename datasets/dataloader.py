@@ -15,7 +15,7 @@ except ImportError:
     raise ImportError("Please install DALI from https://www.github.com/NVIDIA/DALI to run this example.")
 
 
-class data_prefetcher():
+class data_prefetcher:
     """Based on prefetcher from the APEX example
        https://github.com/NVIDIA/apex/blob/5b5d41034b506591a316c308c3d2cd14d5187e23/examples/imagenet/main_amp.py#L265
     """
@@ -78,7 +78,7 @@ def fast_collate(batch, memory_format):
     return tensor, targets
 
 
-class Dataloader():
+class Dataloader:
     def __init__(self, args, dataloader_type='dali'):
         self.args = args
         self.type = dataloader_type
